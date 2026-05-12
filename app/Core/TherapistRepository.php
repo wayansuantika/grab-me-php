@@ -27,6 +27,7 @@ class TherapistRepository extends Repository
                 u.name,
                 u.email,
                 u.phone,
+                t.photo_url,
                 t.specialty,
                 t.experience_years,
                 t.rating,
@@ -36,7 +37,7 @@ class TherapistRepository extends Repository
             INNER JOIN users u ON u.id = t.user_id
             LEFT JOIN therapist_coverage_areas tca ON tca.therapist_id = t.id
             LEFT JOIN coverage_areas ca ON ca.id = tca.area_id
-            GROUP BY t.id, u.name, u.email, u.phone, t.specialty, t.experience_years, t.rating, t.is_active
+            GROUP BY t.id, u.name, u.email, u.phone, t.photo_url, t.specialty, t.experience_years, t.rating, t.is_active
             ORDER BY t.rating DESC, t.id DESC
             LIMIT :limit OFFSET :offset
         ";

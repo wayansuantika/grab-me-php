@@ -74,12 +74,19 @@ function money(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0);
 }
 
+function mediaUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
+    return apiUrl(raw.replace(/^\/+/, ''));
+}
+
 function applySiteBranding(settings = {}) {
     const brand = document.querySelector('.navbar-brand');
     if (!brand) return;
 
     const logoText = String(settings.site_logo_text || 'GrabMas').trim() || 'GrabMas';
-    const logoImage = String(settings.site_logo_image || '').trim();
+    const logoImage = mediaUrl(settings.site_logo_image || '');
 
     if (logoImage) {
         brand.innerHTML = `<img src="${logoImage}" alt="${logoText}" class="nav-logo-img">`;
@@ -166,7 +173,12 @@ function therapistPhotoUrl(photoUrl, fallbackSize = '96x96') {
         return photoUrl;
     }
 
-    const clean = String(photoUrl).replace(/^\/+/, '');
+    let normalized = String(photoUrl).trim();
+    const basePath = appBasePath().replace(/\/+$/, '');
+    if (basePath && normalized.startsWith(basePath + '/')) {
+        normalized = normalized.slice(basePath.length);
+    }
+    const clean = normalized.replace(/^\/+/, '');
     return `${appBasePath()}${clean}`;
 }
 
@@ -233,18 +245,22 @@ function navTitle() {
 function homeTemplate() {
     // Async wrapper — returns a Promise so renderRoute can await it
     return (async () => {
-        const [settingsRes, serviceRes] = await Promise.all([
+        const [settingsRes, serviceRes, therapistsRes, areasRes] = await Promise.all([
             apiFetch('api/settings').catch(() => ({})),
             apiFetch('api/services').catch(() => ({})),
+            apiFetch('api/therapists').catch(() => ({})),
+            apiFetch('api/areas').catch(() => ({})),
         ]);
 
         const settings = settingsRes?.data?.settings || {};
         state.siteSettings = settings;
         applySiteBranding(settings);
         const categories = serviceRes?.data?.categories || [];
+        const therapists = therapistsRes?.data?.therapists || [];
+        const areas = areasRes?.data?.areas || [];
 
-        const heroDesktop = settings.hero_image_desktop || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&w=1920&q=85';
-        const heroMobile  = settings.hero_image_mobile  || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&w=800&q=80';
+        const heroDesktop = mediaUrl(settings.hero_image_desktop) || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&w=1920&q=85';
+        const heroMobile  = mediaUrl(settings.hero_image_mobile)  || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&w=800&q=80';
         const heroTitle   = settings.hero_title    || 'Calm,<br>Delivered<br>to Your Door';
         const heroSub     = settings.hero_subtitle || 'World-class therapists. Signature Balinese treatments. Your villa, hotel, or home.';
         const heroKicker  = settings.hp2_hero_kicker || 'Bali Home Service Spa';
@@ -258,12 +274,20 @@ function homeTemplate() {
         const galleryTitle = settings.hp2_gallery_title || 'Aesthetic, Calm, and Professional';
         const faqLabel = settings.hp2_faq_label || 'FAQ';
         const faqTitle = settings.hp2_faq_title || 'Questions Before You Book';
-        const faqImage = settings.hp2_faq_image || 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&w=700&q=80';
+        const faqImage = mediaUrl(settings.hp2_faq_image) || 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&w=700&q=80';
         const whatsappRaw = String(settings.company_whatsapp || '+62XXXXXXXXXX');
         const whatsappNumber = whatsappRaw.replace(/[^\d]/g, '');
         const whatsappUrl = whatsappNumber
             ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent('Hi GrabMas, I want to book a home spa session.')}`
             : '#/contact';
+
+        const allServices = categories.flatMap((cat) => Array.isArray(cat.services) ? cat.services : []);
+        const activeTherapists = therapists.filter((t) => Number(t.is_active ?? 1) === 1).length;
+        const serviceCount = allServices.length;
+        const areaCount = areas.filter((a) => Number(a.is_active ?? 1) === 1).length;
+        const statTherapists = `${Math.max(activeTherapists, 1)}+`;
+        const statServices = `${Math.max(serviceCount, 1)}+`;
+        const statAreas = `${Math.max(areaCount, 1)}+`;
 
         const serviceImages = [
             'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&w=600&q=75',
@@ -275,14 +299,14 @@ function homeTemplate() {
         ];
 
         const galleryData = [
-            { url: settings.gallery_image_1 || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&w=900&q=75', caption: settings.gallery_caption_1 || 'Signature Massage' },
-            { url: settings.gallery_image_2 || 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&w=500&q=75', caption: settings.gallery_caption_2 || 'Aromatherapy' },
-            { url: settings.gallery_image_3 || 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&w=500&q=75', caption: settings.gallery_caption_3 || 'Deep Tissue' },
-            { url: settings.gallery_image_4 || 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&w=500&q=75', caption: settings.gallery_caption_4 || 'Couples Session' },
-            { url: settings.gallery_image_5 || 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&w=500&q=75', caption: settings.gallery_caption_5 || 'Facial Treatment' },
-            { url: settings.gallery_image_6 || 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&w=500&q=75', caption: settings.gallery_caption_6 || 'Reflexology' },
-            { url: settings.gallery_image_7 || 'https://images.unsplash.com/photo-1612198273663-69d9c74b5dab?auto=format&w=500&q=75', caption: settings.gallery_caption_7 || 'Body Scrub' },
-            { url: settings.gallery_image_8 || 'https://images.unsplash.com/photo-1614170153058-de5e7c6aa65c?auto=format&w=700&q=75', caption: settings.gallery_caption_8 || 'Hot Stone' },
+            { url: mediaUrl(settings.gallery_image_1) || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&w=900&q=75', caption: settings.gallery_caption_1 || 'Signature Massage' },
+            { url: mediaUrl(settings.gallery_image_2) || 'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&w=500&q=75', caption: settings.gallery_caption_2 || 'Aromatherapy' },
+            { url: mediaUrl(settings.gallery_image_3) || 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&w=500&q=75', caption: settings.gallery_caption_3 || 'Deep Tissue' },
+            { url: mediaUrl(settings.gallery_image_4) || 'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&w=500&q=75', caption: settings.gallery_caption_4 || 'Couples Session' },
+            { url: mediaUrl(settings.gallery_image_5) || 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&w=500&q=75', caption: settings.gallery_caption_5 || 'Facial Treatment' },
+            { url: mediaUrl(settings.gallery_image_6) || 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&w=500&q=75', caption: settings.gallery_caption_6 || 'Reflexology' },
+            { url: mediaUrl(settings.gallery_image_7) || 'https://images.unsplash.com/photo-1612198273663-69d9c74b5dab?auto=format&w=500&q=75', caption: settings.gallery_caption_7 || 'Body Scrub' },
+            { url: mediaUrl(settings.gallery_image_8) || 'https://images.unsplash.com/photo-1614170153058-de5e7c6aa65c?auto=format&w=700&q=75', caption: settings.gallery_caption_8 || 'Hot Stone' },
         ];
 
         const faqs = [
@@ -298,7 +322,13 @@ function homeTemplate() {
             ? categories.slice(0, 6).map((cat, i) => `
                 <div class="col-md-6 col-xl-4">
                     <article class="hp2-service-card">
-                        <img src="${serviceImages[i % serviceImages.length]}" alt="${cat.name}" class="hp2-service-img" loading="lazy">
+                        <img src="${(() => {
+                            const withImage = (cat.services || []).find((srv) => srv.image_url);
+                            if (withImage?.image_url) {
+                                return apiUrl(String(withImage.image_url).replace(/^\/+/, ''));
+                            }
+                            return serviceImages[i % serviceImages.length];
+                        })()}" alt="${cat.name}" class="hp2-service-img" loading="lazy">
                         <div class="hp2-service-body">
                             <h3 class="hp2-service-name">${cat.name}</h3>
                             <p class="hp2-service-desc">${cat.description || 'Elegant treatment crafted for stress relief, recovery, and deep rest at your home.'}</p>
@@ -334,10 +364,36 @@ function homeTemplate() {
                             <a href="#/booking" class="btn hp2-btn-primary">Book at Home</a>
                             <a href="#/services" class="btn hp2-btn-secondary">View Treatments</a>
                         </div>
-                        <div class="hp2-proof-row">
-                            <span>${heroProof1}</span>
-                            <span>${heroProof2}</span>
-                            <span>${heroProof3}</span>
+                        <div class="hp2-proof-row" aria-label="Trust Highlights">
+                            <div class="hp2-proof-item">
+                                <span class="hp2-proof-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 3l7 3v6c0 4.2-2.6 7.7-7 9-4.4-1.3-7-4.8-7-9V6l7-3z"></path>
+                                        <path d="M9.2 12.4l1.9 1.9 3.7-3.7"></path>
+                                    </svg>
+                                </span>
+                                <span>${heroProof1}</span>
+                            </div>
+                            <div class="hp2-proof-item">
+                                <span class="hp2-proof-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3.5" y="10" width="17" height="10" rx="2"></rect>
+                                        <path d="M8 10V7.8a4 4 0 0 1 8 0V10"></path>
+                                    </svg>
+                                </span>
+                                <span>${heroProof2}</span>
+                            </div>
+                            <div class="hp2-proof-item">
+                                <span class="hp2-proof-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M4 12h16"></path>
+                                        <path d="M12 4a13 13 0 0 1 0 16"></path>
+                                        <path d="M12 4a13 13 0 0 0 0 16"></path>
+                                    </svg>
+                                </span>
+                                <span>${heroProof3}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -352,9 +408,9 @@ function homeTemplate() {
                         </div>
                         <div class="col-lg-5">
                             <div class="hp2-stat-grid">
-                                <div class="hp2-stat"><strong>10+</strong><span>Years Experience</span></div>
-                                <div class="hp2-stat"><strong>30+</strong><span>Treatment Options</span></div>
-                                <div class="hp2-stat"><strong>7 Days</strong><span>Weekly Availability</span></div>
+                                <div class="hp2-stat"><strong>${statTherapists}</strong><span>Active Therapists</span></div>
+                                <div class="hp2-stat"><strong>${statServices}</strong><span>Treatment Options</span></div>
+                                <div class="hp2-stat"><strong>${statAreas}</strong><span>Coverage Areas</span></div>
                                 <div class="hp2-stat"><strong>2 Min</strong><span>Fast Booking Flow</span></div>
                             </div>
                         </div>
@@ -474,22 +530,34 @@ async function servicesTemplate() {
     const categories = res.data.categories || [];
 
     const html = categories.map((cat) => `
-        <div class="panel-card mb-3">
-            <h4>${cat.name}</h4>
-            <p class="text-muted">${cat.description || ''}</p>
-            <div class="row g-2">
-                ${cat.services.map((srv) => `
-                    <div class="col-md-6">
-                        <div class="border rounded p-2 h-100">
-                            <strong>${srv.name}</strong>
-                            <div class="small text-muted">${srv.duration_minutes} min</div>
-                            <div>${money(srv.price)}</div>
-                            ${srv.is_addon ? '<span class="pill">Add-On Only</span>' : ''}
+        <section class="mb-4">
+            <h4 class="mb-1">${cat.name}</h4>
+            <p class="text-muted mb-3">${cat.description || ''}</p>
+            <div class="row g-3">
+                ${cat.services.map((srv) => {
+                    const imgUrl = srv.image_url ? apiUrl(srv.image_url.replace(/^\//, '')) : '';
+                    return `
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <div class="border rounded overflow-hidden h-100 d-flex flex-column">
+                            ${imgUrl
+                                ? `<div style="aspect-ratio:4/3;overflow:hidden"><img src="${imgUrl}" alt="${srv.name}" style="width:100%;height:100%;object-fit:cover;display:block"></div>`
+                                : `<div style="aspect-ratio:4/3;background:#f0f0f0;display:flex;align-items:center;justify-content:center"><svg width="40" height="40" fill="none" stroke="#bbb" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>`
+                            }
+                            <div class="p-2 flex-grow-1 d-flex flex-column justify-content-between">
+                                <div>
+                                    <strong class="d-block" style="font-size:.92rem">${srv.name}</strong>
+                                    <div class="small text-muted">${srv.duration_minutes} min</div>
+                                </div>
+                                <div class="mt-1 d-flex justify-content-between align-items-center flex-wrap gap-1">
+                                    <span style="font-weight:600">${money(srv.price)}</span>
+                                    ${srv.is_addon ? '<span class="pill" style="font-size:.7rem">Add-On</span>' : ''}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                `).join('')}
+                    </div>`;
+                }).join('')}
             </div>
-        </div>
+        </section>
     `).join('');
 
     return `<section class="hero-card"><h2 class="section-title">Services</h2>${html}</section>`;
@@ -656,33 +724,37 @@ async function bookingTemplate() {
 
                         <h6 class="label-section">Main Services</h6>
                         <div class="service-grid mb-4">
-                            ${mainServices.map((s) => `
-                                <label class="service-card">
+                            ${mainServices.map((s) => {
+                                const imgUrl = s.image_url ? apiUrl(s.image_url.replace(/^\//, '')) : '';
+                                return `<label class="service-card">
                                     <input type="checkbox" class="d-none service-check" value="${s.id}" data-price="${s.price}" data-name="${s.name}">
                                     <div class="service-card-inner">
+                                        ${imgUrl ? `<img src="${imgUrl}" alt="${s.name}" class="service-card-img">` : ''}
                                         <div class="service-name">${s.name}</div>
                                         <div class="small text-muted mb-1">${s.duration_minutes} min</div>
                                         <div class="service-price">${money(s.price)}</div>
                                         <div class="service-check-mark">✓</div>
                                     </div>
-                                </label>
-                            `).join('')}
+                                </label>`;
+                            }).join('')}
                         </div>
 
                         ${addons.length ? `
                         <h6 class="label-section">Optional Add-Ons</h6>
                         <div class="service-grid">
-                            ${addons.map((s) => `
-                                <label class="service-card addon-card">
+                            ${addons.map((s) => {
+                                const imgUrl = s.image_url ? apiUrl(s.image_url.replace(/^\//, '')) : '';
+                                return `<label class="service-card addon-card">
                                     <input type="checkbox" class="d-none addon-check" value="${s.id}" data-price="${s.price}" data-name="${s.name}">
                                     <div class="service-card-inner">
+                                        ${imgUrl ? `<img src="${imgUrl}" alt="${s.name}" class="service-card-img">` : ''}
                                         <div class="service-name">${s.name}</div>
                                         <div class="small text-muted mb-1">${s.duration_minutes} min</div>
                                         <div class="service-price">${money(s.price)}</div>
                                         <div class="service-check-mark">✓</div>
                                     </div>
-                                </label>
-                            `).join('')}
+                                </label>`;
+                            }).join('')}
                         </div>
                         ` : ''}
 
@@ -983,9 +1055,28 @@ async function therapistPanelTemplate() {
                             <form id="therapistPhotoForm" class="d-flex gap-2 align-items-center flex-wrap" enctype="multipart/form-data">
                                 <input type="file" class="form-control form-control-sm" name="photo" accept="image/*" required>
                                 <button class="btn btn-outline-dark btn-sm" type="submit">Upload Photo</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="therapistChooseFromLibraryBtn">Choose from File Library</button>
                             </form>
                         </div>
+                        <div class="form-text mb-2">Recommended size: 600 x 600 px (1:1 square). JPG, PNG, or WebP up to 2 MB.</div>
                         <div id="therapistPhotoResult"></div>
+
+                        <div class="modal fade" id="therapistMediaLibraryModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Choose Profile Photo from File Library</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div id="therapistMediaLibraryGrid" class="admin-files-grid"></div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </section>
                 </section>
 
@@ -1024,7 +1115,7 @@ async function therapistPanelTemplate() {
 async function adminPanelTemplate() {
     if (!state.user || state.user.role !== 'admin') return staticTemplate('Admin Panel', 'Admin account required.');
 
-    const [dashboardRes, therapistsRes, servicesRes, areasRes, bookingsRes, paymentsRes, auditRes, settingsRes] = await Promise.all([
+    const [dashboardRes, therapistsRes, servicesRes, areasRes, bookingsRes, paymentsRes, auditRes, settingsRes, filesRes] = await Promise.all([
         apiFetch('api/admin/dashboard'),
         apiFetch('api/admin/therapists'),
         apiFetch('api/admin/services'),
@@ -1033,6 +1124,7 @@ async function adminPanelTemplate() {
         apiFetch('api/admin/payments'),
         apiFetch('api/admin/audit'),
         apiFetch('api/settings').catch(() => ({})),
+        apiFetch('api/admin/files').catch(() => ({})),
     ]);
 
     const metrics = dashboardRes?.data?.metrics || {};
@@ -1050,7 +1142,9 @@ async function adminPanelTemplate() {
     const auditLogs = auditRes?.data?.logs || [];
     const auditPagination = auditRes?.data?.pagination || {};
     const siteSettings = settingsRes?.data?.settings || {};
+    const mediaFiles = filesRes?.data?.files || [];
     const customersTotal = Number(operations.customers_total ?? s.customers ?? 0);
+    const customersRegisteredTotal = Number(operations.customers_registered_total ?? customersTotal);
     const therapistsTotal = Number(operations.therapists_total ?? s.therapists ?? 0);
     const therapistsActive = Number(operations.therapists_active ?? 0);
     const bookingsTotal = Number(operations.bookings_total ?? s.bookings ?? 0);
@@ -1080,6 +1174,7 @@ async function adminPanelTemplate() {
                 <button class="sidebar-link" data-panel-target="admin-services">Service</button>
                 <button class="sidebar-link" data-panel-target="admin-areas">Coverage Areas</button>
                 <button class="sidebar-link" data-panel-target="admin-settings">Site Settings</button>
+                <button class="sidebar-link" data-panel-target="admin-files">File</button>
             </aside>
 
             <div class="dashboard-content">
@@ -1095,7 +1190,7 @@ async function adminPanelTemplate() {
                     </section>
 
                     <section class="row g-3 mb-3 admin-metrics">
-                        <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Customers</div><div class="stat-value">${customersTotal}</div></div></div>
+                        <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Customers (With Booking)</div><div class="stat-value">${customersTotal}</div><div class="small text-muted mt-1">Registered ${customersRegisteredTotal}</div></div></div>
                         <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Total Therapists</div><div class="stat-value">${therapistsTotal}</div><div class="small text-muted mt-1">${therapistsActive} active</div></div></div>
                         <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Total Bookings</div><div class="stat-value">${bookingsTotal}</div></div></div>
                         <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Collected Revenue</div><div class="stat-value">${money(collectedAmount)}</div><div class="small text-muted mt-1">Pending ${money(pendingAmount)}</div></div></div>
@@ -1188,9 +1283,12 @@ async function adminPanelTemplate() {
                                     : '<span class="badge bg-secondary-subtle text-secondary-emphasis">-</span>';
                                 return `<div class="panel-card admin-mobile-card">
                                     <div class="d-flex justify-content-between align-items-start gap-2">
-                                        <div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <img src="${therapistPhotoUrl(t.photo_url, '56x56')}" alt="${t.name}" class="therapist-avatar therapist-avatar-admin-mobile" onerror="this.onerror=null;this.src='${avatarFallbackUrl('56x56')}'">
+                                            <div>
                                             <div class="fw-semibold">${t.name}</div>
                                             <div class="small text-muted">${t.email}</div>
+                                            </div>
                                         </div>
                                         ${Number(t.is_active) === 1 ? '<span class="badge bg-success-subtle text-success-emphasis">Active</span>' : '<span class="badge bg-secondary-subtle text-secondary-emphasis">Inactive</span>'}
                                     </div>
@@ -1205,7 +1303,7 @@ async function adminPanelTemplate() {
                         </div>
                         <div class="table-responsive panel-card d-none d-lg-block">
                             <table class="table table-sm align-middle mb-0">
-                                <thead><tr><th>Name</th><th>Email</th><th>Specialty</th><th>Exp.</th><th>Rating</th><th>Coverage</th><th>Status</th><th>Action</th></tr></thead>
+                                <thead><tr><th>Photo</th><th>Name</th><th>Email</th><th>Specialty</th><th>Exp.</th><th>Rating</th><th>Coverage</th><th>Status</th><th>Action</th></tr></thead>
                                 <tbody>
                                     ${therapists.map((t) => {
                                         const g = Array.isArray(t.coverage_groups) && t.coverage_groups.length > 0
@@ -1216,6 +1314,7 @@ async function adminPanelTemplate() {
                                             : g === 'B' ? '<span class="badge bg-warning-subtle text-warning-emphasis">B</span>'
                                             : '<span class="badge bg-secondary-subtle text-secondary-emphasis">-</span>';
                                         return `<tr>
+                                            <td><img src="${therapistPhotoUrl(t.photo_url, '56x56')}" alt="${t.name}" class="therapist-avatar therapist-avatar-admin-table" onerror="this.onerror=null;this.src='${avatarFallbackUrl('56x56')}'"></td>
                                             <td>${t.name}</td>
                                             <td>${t.email}</td>
                                             <td>${t.specialty || '-'}</td>
@@ -1227,7 +1326,7 @@ async function adminPanelTemplate() {
                                                 <button class="btn btn-outline-secondary btn-sm js-edit-therapist" type="button" data-therapist='${JSON.stringify(t).replace(/'/g, '&#39;')}'>Edit</button>
                                             </td>
                                         </tr>`;
-                                    }).join('') || '<tr><td colspan="8">No therapists found.</td></tr>'}
+                                    }).join('') || '<tr><td colspan="9">No therapists found.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
@@ -1251,6 +1350,21 @@ async function adminPanelTemplate() {
                                             <div class="col-md-6"><input type="email" class="form-control" name="email" placeholder="Email" required></div>
                                             <div class="col-md-6"><input class="form-control" name="phone" placeholder="Phone"></div>
                                             <div class="col-md-6"><input class="form-control" name="specialty" placeholder="Specialty"></div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-semibold">Profile Photo</label>
+                                                <input type="hidden" name="photo_url" id="adminTherapistPhotoUrl" value="">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <input class="form-control" type="file" id="adminTherapistPhotoInput" accept="image/jpeg,image/png" style="flex:1;min-width:220px">
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="adminTherapistChooseFromLibraryBtn">Choose from File Library</button>
+                                                    <button type="button" class="btn btn-outline-dark btn-sm" id="adminTherapistClearPhotoBtn">Clear</button>
+                                                    <div id="adminTherapistPhotoPreview" class="admin-therapist-photo-preview"></div>
+                                                    <div id="adminTherapistPhotoBadge" class="d-none">
+                                                        <span class="badge bg-info-subtle text-info-emphasis small">From Library</span>
+                                                    </div>
+                                                </div>
+                                                <div class="form-text">Use square image for best result (recommended 600 x 600 px).</div>
+                                                <div id="adminTherapistPhotoResult" class="mt-1"></div>
+                                            </div>
                                             <div class="col-md-6"><input type="number" min="0" class="form-control" name="experience_years" placeholder="Experience"></div>
                                             <div class="col-md-6"><input type="number" min="1" max="5" step="0.1" class="form-control" name="rating" value="5" placeholder="Rating"></div>
                                             <div class="col-12"><input type="password" class="form-control" name="password" placeholder="Password (required for new therapist)"></div>
@@ -1298,14 +1412,17 @@ async function adminPanelTemplate() {
                         </div>
                         <div class="table-responsive panel-card d-none d-lg-block">
                             <table class="table table-sm align-middle mb-0">
-                                <thead><tr><th>Name</th><th>Category</th><th>Duration</th><th>Price</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+                                <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Duration</th><th>Price</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
                                 <tbody>
-                                    ${services.map((srv) => `
+                                    ${services.map((srv) => {
+                                        const imgUrl = srv.image_url ? apiUrl(srv.image_url.replace(/^\//, '')) : '';
+                                        return `
                                         <tr>
+                                            <td style="width:56px">${imgUrl ? `<img src="${imgUrl}" alt="" style="width:48px;height:36px;object-fit:cover;border-radius:6px">` : '<span class="text-muted small">—</span>'}</td>
                                             <td>${srv.name}</td><td>${srv.category_name}</td><td>${srv.duration_minutes} min</td><td>${money(srv.price)}</td><td>${Number(srv.is_addon) === 1 ? '<span class="badge bg-info-subtle text-info-emphasis">Add-on</span>' : '<span class="badge bg-light text-dark">Main</span>'}</td><td>${Number(srv.is_active) === 1 ? '<span class="badge bg-success-subtle text-success-emphasis">Active</span>' : '<span class="badge bg-secondary-subtle text-secondary-emphasis">Inactive</span>'}</td>
                                             <td><button class="btn btn-outline-secondary btn-sm js-edit-service" type="button" data-service='${JSON.stringify(srv).replace(/'/g, '&#39;')}'>Edit</button></td>
-                                        </tr>
-                                    `).join('') || '<tr><td colspan="7">No services found.</td></tr>'}
+                                        </tr>`;
+                                    }).join('') || '<tr><td colspan="8">No services found.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
@@ -1333,6 +1450,17 @@ async function adminPanelTemplate() {
                                                 </select>
                                             </div>
                                             <div class="col-12"><textarea class="form-control" name="description" rows="3" placeholder="Description"></textarea></div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-semibold">Service Image (JPG/PNG, max 5 MB)</label>
+                                                <input type="hidden" name="image_url" id="adminServiceImageUrl" value="">
+                                                <div class="d-flex align-items-center gap-3 flex-wrap">
+                                                    <input class="form-control" type="file" id="adminServiceImageInput" accept="image/jpeg,image/png" style="flex:1;min-width:200px">
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="adminServiceChooseFromLibraryBtn">Choose from File Library</button>
+                                                    <div id="adminServiceImagePreview" style="width:80px;height:60px;border-radius:8px;border:1px solid #dee2e6;background:#f8f9fa;background-size:cover;background-position:center;flex-shrink:0"></div>
+                                                </div>
+                                                <div class="form-text">Recommended size: 800 x 600 px (4:3 ratio) for best fit on booking and services cards.</div>
+                                                <div id="adminServiceImageResult" class="mt-1"></div>
+                                            </div>
                                             <div class="col-md-4"><input type="number" class="form-control" name="duration_minutes" value="60" placeholder="Duration"></div>
                                             <div class="col-md-4"><input type="number" class="form-control" name="price" placeholder="Price" required></div>
                                             <div class="col-md-4"><input type="number" class="form-control" name="sort_order" value="0" placeholder="Sort"></div>
@@ -1634,6 +1762,91 @@ async function adminPanelTemplate() {
                         <div class="small text-muted mt-3">Page ${Number(auditPagination.page || 1)} of ${Number(auditPagination.total_pages || 1)}</div>
                     </section>
                 </section>
+
+                <section id="admin-files" class="panel-section">
+                    <section class="hero-card mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <h3 class="section-title mb-1">File Manager</h3>
+                                <p class="text-muted small mb-0">Upload and manage image files (JPG, PNG). Maximum 5 MB per file.</p>
+                            </div>
+                            <div class="pill">${mediaFiles.length} file${mediaFiles.length !== 1 ? 's' : ''}</div>
+                        </div>
+                    </section>
+
+                    <section class="panel-card mb-4">
+                        <h6 class="fw-semibold mb-3">Upload New File</h6>
+                        <form id="adminFileUploadForm" class="d-flex align-items-end gap-3 flex-wrap">
+                            <div style="flex:1;min-width:220px">
+                                <label class="form-label small fw-semibold" for="adminFileInput">Select Image (JPG or PNG)</label>
+                                <input class="form-control" type="file" id="adminFileInput" name="file" accept="image/jpeg,image/png" required>
+                                <div class="form-text">Recommended size: 800 x 600 px (4:3 ratio) for best fit on service cards.</div>
+                            </div>
+                            <button class="btn btn-luxury" type="submit" id="adminFileUploadBtn" data-submit-label="Upload">Upload</button>
+                        </form>
+                        <div id="adminFileUploadResult" class="mt-2"></div>
+                    </section>
+
+                    <div id="adminFilesGrid" class="admin-files-grid">
+                        ${mediaFiles.length === 0
+                            ? '<div class="panel-card text-center text-muted small py-5">No files uploaded yet.</div>'
+                            : mediaFiles.map((f) => {
+                                const url = apiUrl(f.filename.includes('/') ? f.filename : `uploads/files/${f.filename}`);
+                                const kb = Math.round(Number(f.file_size) / 1024);
+                                const safeOriginal = String(f.original_name).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                return `<div class="admin-file-card" data-file-id="${f.id}">
+                                    <div class="admin-file-thumb" style="background-image:url('${url}')"></div>
+                                    <div class="admin-file-meta">
+                                        <div class="admin-file-name" title="${safeOriginal}">${safeOriginal}</div>
+                                        <div class="small text-muted">${kb} KB &middot; ${f.mime_type}</div>
+                                        <div class="small text-muted">${String(f.created_at || '').slice(0,10)}</div>
+                                    </div>
+                                    <div class="admin-file-actions">
+                                        <button class="btn btn-sm btn-outline-secondary js-view-file" data-url="${url}" data-name="${safeOriginal}">View</button>
+                                        <button class="btn btn-sm btn-outline-primary js-copy-url" data-url="${url}">Copy URL</button>
+                                        <button class="btn btn-sm btn-outline-danger js-delete-file" data-file-id="${f.id}" data-filename="${safeOriginal}">Delete</button>
+                                    </div>
+                                </div>`;
+                            }).join('')
+                        }
+                    </div>
+                </section>
+
+    <!-- File Lightbox Modal -->
+    <div class="modal fade" id="filePreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="background:transparent;border:none;box-shadow:none">
+                <div class="modal-header border-0 pb-1" style="background:rgba(0,0,0,.7);border-radius:.5rem .5rem 0 0">
+                    <span class="text-white small fw-semibold" id="filePreviewName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+                    <div class="d-flex gap-2 ms-3">
+                        <button class="btn btn-sm btn-outline-light" id="filePreviewCopyBtn">Copy URL</button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                </div>
+                <div class="modal-body p-0 text-center" style="background:#111;border-radius:0 0 .5rem .5rem">
+                    <img id="filePreviewImg" src="" alt="" style="max-width:100%;max-height:80vh;object-fit:contain;display:block;margin:0 auto">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reusable Media Library Modal -->
+    <div class="modal fade" id="mediaLibraryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Choose Image from File Library</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mediaLibraryGrid" class="admin-files-grid"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
                 <section id="admin-settings" class="panel-section">
                     <section class="hero-card">
@@ -2305,6 +2518,10 @@ function attachTherapistPanelHandlers() {
 
     const photoForm = document.getElementById('therapistPhotoForm');
     const photoResult = document.getElementById('therapistPhotoResult');
+    const therapistMediaLibraryModalEl = document.getElementById('therapistMediaLibraryModal');
+    const therapistMediaLibraryGrid = document.getElementById('therapistMediaLibraryGrid');
+    const therapistMediaLibraryModal = therapistMediaLibraryModalEl ? new bootstrap.Modal(therapistMediaLibraryModalEl) : null;
+    const chooseFromLibraryBtn = document.getElementById('therapistChooseFromLibraryBtn');
     if (photoForm && photoResult) {
         photoForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2328,6 +2545,64 @@ function attachTherapistPanelHandlers() {
             } catch (err) {
                 photoResult.innerHTML = '';
                 showToast(getErrorMessage(err, 'Failed to upload photo.'), 'danger');
+            }
+        });
+
+        chooseFromLibraryBtn?.addEventListener('click', async () => {
+            if (!therapistMediaLibraryModal || !therapistMediaLibraryGrid) return;
+            therapistMediaLibraryGrid.innerHTML = '<div class="panel-card text-center text-muted small py-4">Loading files...</div>';
+            therapistMediaLibraryModal.show();
+            try {
+                const res = await apiFetch('api/therapist/files');
+                const files = res?.data?.files || [];
+                if (!files.length) {
+                    therapistMediaLibraryGrid.innerHTML = '<div class="panel-card text-center text-muted small py-5">No files available.</div>';
+                    return;
+                }
+                therapistMediaLibraryGrid.innerHTML = files.map((f) => {
+                    const filePath = f.filename.includes('/') ? f.filename : `uploads/files/${f.filename}`;
+                    const url = apiUrl(filePath);
+                    const safeOriginal = String(f.original_name || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    return `<button type="button" class="admin-file-card js-therapist-media-item text-start" data-url="${url}" style="padding:0;border:1px solid rgba(0,0,0,.08)">
+                        <div class="admin-file-thumb" style="background-image:url('${url}')"></div>
+                        <div class="admin-file-meta">
+                            <div class="admin-file-name" title="${safeOriginal}">${safeOriginal || 'image'}</div>
+                            <div class="small text-muted">Use as profile photo</div>
+                        </div>
+                    </button>`;
+                }).join('');
+
+                therapistMediaLibraryGrid.querySelectorAll('.js-therapist-media-item').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const fullUrl = String(btn.dataset.url || '');
+                        let photoUrl = fullUrl;
+                        try {
+                            const parsed = new URL(fullUrl, window.location.origin);
+                            const basePath = appBasePath().replace(/\/+$/, '');
+                            let path = parsed.pathname;
+                            if (basePath && path.startsWith(basePath + '/')) {
+                                path = path.slice(basePath.length);
+                            }
+                            photoUrl = path.startsWith('/') ? path : '/' + path;
+                        } catch {
+                            // keep fallback value
+                        }
+
+                        try {
+                            const data = await apiFetch('api/therapist/profile-photo/select', {
+                                method: 'POST',
+                                body: JSON.stringify({ photo_url: photoUrl }),
+                            });
+                            therapistMediaLibraryModal.hide();
+                            showToast(data.message || 'Profile photo updated.', 'success');
+                            setTimeout(() => renderRoute(), 300);
+                        } catch (err) {
+                            showToast(getErrorMessage(err, 'Failed to set profile photo.'), 'danger');
+                        }
+                    });
+                });
+            } catch (err) {
+                therapistMediaLibraryGrid.innerHTML = `<div class="panel-card text-center text-danger small py-4">${getErrorMessage(err, 'Failed to load files.')}</div>`;
             }
         });
     }
@@ -2409,14 +2684,128 @@ function attachAdminPanelHandlers() {
     const areaModalSubtitle = document.getElementById('adminAreaModalSubtitle');
     const newAreaBtn = document.getElementById('adminNewAreaBtn');
 
+    const mediaLibraryModalEl = document.getElementById('mediaLibraryModal');
+    const mediaLibraryGrid = document.getElementById('mediaLibraryGrid');
+    const mediaLibraryModal = mediaLibraryModalEl ? new bootstrap.Modal(mediaLibraryModalEl) : null;
+    let mediaLibraryOnSelect = null;
+
+    const toStoredMediaUrl = (rawUrl) => {
+        const url = String(rawUrl || '').trim();
+        if (!url) return '';
+        if (/^(data:|blob:)/i.test(url)) {
+            return url;
+        }
+
+        try {
+            const parsed = new URL(url, window.location.origin);
+            if (parsed.origin === window.location.origin) {
+                const basePath = appBasePath().replace(/\/+$/, '');
+                let path = parsed.pathname;
+                if (basePath && path.startsWith(basePath + '/')) {
+                    path = path.slice(basePath.length);
+                }
+                return path.startsWith('/') ? path : '/' + path;
+            }
+            return url;
+        } catch {
+            // Fall through for plain relative paths.
+        }
+
+        return url.startsWith('/') ? url : '/' + url.replace(/^\/+/, '');
+    };
+
+    const openMediaLibrary = async (onSelect) => {
+        if (!mediaLibraryModal || !mediaLibraryGrid) return;
+        mediaLibraryOnSelect = typeof onSelect === 'function' ? onSelect : null;
+        mediaLibraryGrid.innerHTML = '<div class="panel-card text-center text-muted small py-4">Loading files...</div>';
+        mediaLibraryModal.show();
+
+        try {
+            const res = await apiFetch('api/admin/files');
+            const files = res?.data?.files || [];
+            if (!files.length) {
+                mediaLibraryGrid.innerHTML = '<div class="panel-card text-center text-muted small py-5">No files uploaded yet.</div>';
+                return;
+            }
+            mediaLibraryGrid.innerHTML = files.map((f) => {
+                const filePath = f.filename.includes('/') ? f.filename : `uploads/files/${f.filename}`;
+                const url = apiUrl(filePath);
+                const safeOriginal = String(f.original_name || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                return `<button type="button" class="admin-file-card js-media-library-item text-start" data-url="${url}" style="padding:0;border:1px solid rgba(0,0,0,.08)">
+                    <div class="admin-file-thumb" style="background-image:url('${url}')"></div>
+                    <div class="admin-file-meta">
+                        <div class="admin-file-name" title="${safeOriginal}">${safeOriginal || 'image'}</div>
+                        <div class="small text-muted">Use this image</div>
+                    </div>
+                </button>`;
+            }).join('');
+
+            mediaLibraryGrid.querySelectorAll('.js-media-library-item').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const selectedUrl = toStoredMediaUrl(btn.dataset.url || '');
+                    if (mediaLibraryOnSelect && selectedUrl) {
+                        mediaLibraryOnSelect(selectedUrl);
+                    }
+                    mediaLibraryModal.hide();
+                });
+            });
+        } catch (err) {
+            mediaLibraryGrid.innerHTML = `<div class="panel-card text-center text-danger small py-4">${getErrorMessage(err, 'Failed to load files.')}</div>`;
+        }
+    };
+
+    mediaLibraryModalEl?.addEventListener('hidden.bs.modal', () => {
+        mediaLibraryOnSelect = null;
+    });
+
     if (therapistForm && therapistResult) {
         const therapistModal = therapistModalEl ? new bootstrap.Modal(therapistModalEl) : null;
+        const therapistPhotoInput = document.getElementById('adminTherapistPhotoInput');
+        const therapistPhotoUrlInput = document.getElementById('adminTherapistPhotoUrl');
+        const therapistPhotoPreview = document.getElementById('adminTherapistPhotoPreview');
+        const therapistPhotoResult = document.getElementById('adminTherapistPhotoResult');
+        const therapistChooseBtn = document.getElementById('adminTherapistChooseFromLibraryBtn');
+        const therapistClearPhotoBtn = document.getElementById('adminTherapistClearPhotoBtn');
+
+        const setTherapistPhotoPreview = (storedUrl) => {
+            if (!therapistPhotoPreview) return;
+            const finalUrl = therapistPhotoUrl(storedUrl || '', '56x56');
+            therapistPhotoPreview.style.backgroundImage = `url('${finalUrl}')`;
+            const badgeEl = document.getElementById('adminTherapistPhotoBadge');
+            if (badgeEl) {
+                const isFromLibrary = storedUrl && (storedUrl.startsWith('/uploads/') || storedUrl.includes('uploads/'));
+                badgeEl.classList.toggle('d-none', !isFromLibrary);
+                if (isFromLibrary) {
+                    const badge = badgeEl.querySelector('.badge');
+                    if (badge) {
+                        badge.classList.remove('bg-danger-subtle', 'text-danger-emphasis');
+                        badge.classList.add('bg-info-subtle', 'text-info-emphasis');
+                        badge.textContent = 'From Library';
+                    }
+                }
+            }
+            therapistPhotoPreview.onerror = () => {
+                const badgeEl = document.getElementById('adminTherapistPhotoBadge');
+                if (badgeEl && !badgeEl.classList.contains('d-none')) {
+                    const badge = badgeEl.querySelector('.badge');
+                    if (badge) {
+                        badge.classList.remove('bg-info-subtle', 'text-info-emphasis');
+                        badge.classList.add('bg-danger-subtle', 'text-danger-emphasis');
+                        badge.textContent = 'Missing from Library';
+                    }
+                }
+            };
+        };
 
         const resetTherapistForm = () => {
             therapistForm.reset();
             therapistForm.querySelector('[name="id"]').value = '';
             therapistForm.querySelector('[name="rating"]').value = '5';
             therapistForm.querySelector('[name="is_active"]').checked = true;
+            if (therapistPhotoInput) therapistPhotoInput.value = '';
+            if (therapistPhotoUrlInput) therapistPhotoUrlInput.value = '';
+            if (therapistPhotoResult) therapistPhotoResult.innerHTML = '';
+            setTherapistPhotoPreview('');
             therapistResult.innerHTML = '';
         };
 
@@ -2430,7 +2819,52 @@ function attachAdminPanelHandlers() {
             therapistForm.querySelector('[name="rating"]').value = data.rating || 5;
             therapistForm.querySelector('[name="password"]').value = '';
             therapistForm.querySelector('[name="is_active"]').checked = Number(data.is_active ?? 1) === 1;
+            if (therapistPhotoInput) therapistPhotoInput.value = '';
+            if (therapistPhotoUrlInput) therapistPhotoUrlInput.value = data.photo_url || '';
+            if (therapistPhotoResult) therapistPhotoResult.innerHTML = '';
+            setTherapistPhotoPreview(data.photo_url || '');
         };
+
+        therapistChooseBtn?.addEventListener('click', () => {
+            openMediaLibrary((selectedUrl) => {
+                if (therapistPhotoUrlInput) therapistPhotoUrlInput.value = selectedUrl;
+                if (therapistPhotoInput) therapistPhotoInput.value = '';
+                setTherapistPhotoPreview(selectedUrl);
+                if (therapistPhotoResult) {
+                    therapistPhotoResult.innerHTML = '<div class="small text-success">Profile photo selected from File Library.</div>';
+                }
+            });
+        });
+
+        therapistClearPhotoBtn?.addEventListener('click', () => {
+            if (therapistPhotoUrlInput) therapistPhotoUrlInput.value = '';
+            if (therapistPhotoInput) therapistPhotoInput.value = '';
+            setTherapistPhotoPreview('');
+            if (therapistPhotoResult) {
+                therapistPhotoResult.innerHTML = '<div class="small text-muted">Profile photo cleared. Save therapist to apply.</div>';
+            }
+        });
+
+        therapistPhotoInput?.addEventListener('change', async () => {
+            if (!therapistPhotoInput.files?.length) return;
+            const fd = new FormData();
+            fd.append('file', therapistPhotoInput.files[0]);
+            if (therapistPhotoResult) therapistPhotoResult.innerHTML = '<div class="small text-muted">Uploading photo...</div>';
+            try {
+                const res = await apiFetch('api/admin/files/upload', {
+                    method: 'POST',
+                    body: fd,
+                    headers: {},
+                });
+                const photoUrl = String(res?.data?.url || '');
+                if (!photoUrl) throw new Error('Invalid upload response.');
+                if (therapistPhotoUrlInput) therapistPhotoUrlInput.value = photoUrl;
+                setTherapistPhotoPreview(photoUrl);
+                if (therapistPhotoResult) therapistPhotoResult.innerHTML = '<div class="small text-success">Photo uploaded and selected.</div>';
+            } catch (err) {
+                if (therapistPhotoResult) therapistPhotoResult.innerHTML = `<div class="small text-danger">${getErrorMessage(err, 'Failed to upload photo.')}</div>`;
+            }
+        });
 
         const openTherapistModal = (data = null) => {
             if (data) {
@@ -2456,6 +2890,7 @@ function attachAdminPanelHandlers() {
             payload.experience_years = Number(payload.experience_years || 0);
             payload.rating = Number(payload.rating || 5);
             payload.is_active = therapistForm.querySelector('[name="is_active"]').checked;
+            payload.photo_url = String(payload.photo_url || '').trim();
 
             try {
                 const res = await apiFetch('api/admin/therapists/save', { method: 'POST', body: JSON.stringify(payload) });
@@ -2491,11 +2926,17 @@ function attachAdminPanelHandlers() {
         const resetServiceForm = () => {
             serviceForm.reset();
             serviceForm.querySelector('[name="id"]').value = '';
+            const imageUrlInput = serviceForm.querySelector('[name="image_url"]');
+            if (imageUrlInput) imageUrlInput.value = '';
             serviceForm.querySelector('[name="duration_minutes"]').value = '60';
             serviceForm.querySelector('[name="sort_order"]').value = '0';
             serviceForm.querySelector('[name="is_addon"]').checked = false;
             serviceForm.querySelector('[name="is_active"]').checked = true;
             serviceResult.innerHTML = '';
+            const previewEl = document.getElementById('adminServiceImagePreview');
+            if (previewEl) { previewEl.style.backgroundImage = 'none'; previewEl.dataset.currentUrl = ''; previewEl.dataset.serviceId = ''; }
+            const imgResult = document.getElementById('adminServiceImageResult');
+            if (imgResult) imgResult.innerHTML = '';
         };
 
         const populateServiceForm = (data = {}) => {
@@ -2503,12 +2944,42 @@ function attachAdminPanelHandlers() {
             serviceForm.querySelector('[name="name"]').value = data.name || '';
             serviceForm.querySelector('[name="category_id"]').value = data.category_id || '';
             serviceForm.querySelector('[name="description"]').value = data.description || '';
+            const imageUrlInput = serviceForm.querySelector('[name="image_url"]');
+            if (imageUrlInput) imageUrlInput.value = data.image_url || '';
             serviceForm.querySelector('[name="duration_minutes"]').value = data.duration_minutes || 60;
             serviceForm.querySelector('[name="price"]').value = data.price || '';
             serviceForm.querySelector('[name="sort_order"]').value = data.sort_order || 0;
             serviceForm.querySelector('[name="is_addon"]').checked = Number(data.is_addon) === 1;
             serviceForm.querySelector('[name="is_active"]').checked = Number(data.is_active ?? 1) === 1;
+            // Show current image preview
+            const previewEl = document.getElementById('adminServiceImagePreview');
+            const imgInput = document.getElementById('adminServiceImageInput');
+            if (previewEl) {
+                const imgUrl = data.image_url ? apiUrl(data.image_url.replace(/^\//, '')) : '';
+                previewEl.style.backgroundImage = imgUrl ? `url('${imgUrl}')` : 'none';
+                previewEl.dataset.currentUrl = data.image_url || '';
+                previewEl.dataset.serviceId = data.id || '';
+            }
+            if (imgInput) imgInput.value = '';
         };
+
+        const serviceChooseBtn = document.getElementById('adminServiceChooseFromLibraryBtn');
+        serviceChooseBtn?.addEventListener('click', () => {
+            openMediaLibrary((selectedUrl) => {
+                const imageUrlInput = serviceForm.querySelector('[name="image_url"]');
+                const previewEl = document.getElementById('adminServiceImagePreview');
+                const imgInput = document.getElementById('adminServiceImageInput');
+                if (imageUrlInput) imageUrlInput.value = selectedUrl;
+                if (previewEl) {
+                    const finalUrl = apiUrl(selectedUrl.replace(/^\//, ''));
+                    previewEl.style.backgroundImage = `url('${finalUrl}')`;
+                    previewEl.dataset.currentUrl = selectedUrl;
+                }
+                if (imgInput) imgInput.value = '';
+                const imgResult = document.getElementById('adminServiceImageResult');
+                if (imgResult) imgResult.innerHTML = '<div class="small text-success">Image selected from File Library.</div>';
+            });
+        });
 
         const openServiceModal = (data = null) => {
             if (data) {
@@ -2540,6 +3011,19 @@ function attachAdminPanelHandlers() {
 
             try {
                 const res = await apiFetch('api/admin/services/save', { method: 'POST', body: JSON.stringify(payload) });
+                // After saving, upload image if one was selected
+                const imgInput = document.getElementById('adminServiceImageInput');
+                const savedId = Number(res.data?.id || payload.id || 0);
+                if (imgInput?.files?.length && savedId > 0) {
+                    const imgFd = new FormData();
+                    imgFd.append('image', imgInput.files[0]);
+                    imgFd.append('service_id', String(savedId));
+                    try {
+                        await apiFetch(`api/admin/services/${savedId}/image`, { method: 'POST', body: imgFd, headers: {} });
+                    } catch (imgErr) {
+                        showToast('Service saved but image upload failed: ' + getErrorMessage(imgErr, ''), 'warning');
+                    }
+                }
                 showToast(res.message || 'Service saved.', 'success');
                 setTimeout(() => {
                     serviceModal?.hide();
@@ -2638,6 +3122,26 @@ function attachAdminPanelHandlers() {
     const settingsForm = document.getElementById('adminSettingsForm');
     const settingsResult = document.getElementById('adminSettingsResult');
     if (settingsForm && settingsResult) {
+        const settingsImageFieldPattern = /^(site_logo_image|hero_image_desktop|hero_image_mobile|hp2_faq_image|gallery_image_\d+)$/;
+        settingsForm.querySelectorAll('input[name]').forEach((input) => {
+            const fieldName = String(input.getAttribute('name') || '');
+            if (!settingsImageFieldPattern.test(fieldName)) return;
+            if (input.dataset.mediaChooserBound === '1') return;
+            input.dataset.mediaChooserBound = '1';
+
+            const chooserBtn = document.createElement('button');
+            chooserBtn.type = 'button';
+            chooserBtn.className = 'btn btn-outline-secondary btn-sm mt-1';
+            chooserBtn.textContent = 'Use from File Library';
+            chooserBtn.addEventListener('click', () => {
+                openMediaLibrary((selectedUrl) => {
+                    input.value = selectedUrl;
+                    showToast('Image selected for ' + fieldName.replace(/_/g, ' ') + '.', 'success');
+                });
+            });
+            input.insertAdjacentElement('afterend', chooserBtn);
+        });
+
         settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const fd = new FormData(settingsForm);
@@ -2652,6 +3156,103 @@ function attachAdminPanelHandlers() {
             }
         });
     }
+
+    // ── File Manager ──────────────────────────────────────────────────
+    const fileUploadForm = document.getElementById('adminFileUploadForm');
+    const fileUploadResult = document.getElementById('adminFileUploadResult');
+    const fileUploadBtn = document.getElementById('adminFileUploadBtn');
+    if (fileUploadForm) {
+        fileUploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = fileUploadForm.querySelector('[name="file"]');
+            if (!fileInput?.files?.length) {
+                showToast('Please select a file to upload.', 'danger');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('file', fileInput.files[0]);
+            if (fileUploadBtn) { fileUploadBtn.disabled = true; fileUploadBtn.textContent = 'Uploading…'; }
+            if (fileUploadResult) fileUploadResult.innerHTML = '';
+            try {
+                const res = await apiFetch('api/admin/files/upload', {
+                    method: 'POST',
+                    body: fd,
+                    headers: {},
+                });
+                showToast(res.message || 'File uploaded.', 'success');
+                setTimeout(() => renderRoute(), 300);
+            } catch (err) {
+                showToast(getErrorMessage(err, 'Upload failed.'), 'danger');
+            } finally {
+                if (fileUploadBtn) { fileUploadBtn.disabled = false; fileUploadBtn.textContent = fileUploadBtn.dataset.submitLabel || 'Upload'; }
+            }
+        });
+    }
+
+    // ── File lightbox ─────────────────────────────────────────────────
+    const filePreviewModalEl = document.getElementById('filePreviewModal');
+    const filePreviewImg = document.getElementById('filePreviewImg');
+    const filePreviewName = document.getElementById('filePreviewName');
+    const filePreviewCopyBtn = document.getElementById('filePreviewCopyBtn');
+    const filePreviewModal = filePreviewModalEl ? new bootstrap.Modal(filePreviewModalEl) : null;
+
+    if (filePreviewModalEl && filePreviewCopyBtn) {
+        filePreviewCopyBtn.addEventListener('click', async () => {
+            const url = filePreviewImg?.src || '';
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+                const orig = filePreviewCopyBtn.textContent;
+                filePreviewCopyBtn.textContent = 'Copied!';
+                setTimeout(() => { filePreviewCopyBtn.textContent = orig; }, 1800);
+            } catch {
+                showToast('Could not copy URL.', 'danger');
+            }
+        });
+    }
+
+    document.querySelectorAll('.js-view-file').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const url = String(btn.dataset.url || '');
+            const name = String(btn.dataset.name || '');
+            if (!url || !filePreviewModal) return;
+            if (filePreviewImg) filePreviewImg.src = url;
+            if (filePreviewName) filePreviewName.textContent = name;
+            filePreviewModal.show();
+        });
+    });
+
+    document.querySelectorAll('.js-copy-url').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const url = String(btn.dataset.url || '');
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = orig; }, 1800);
+            } catch {
+                showToast('Could not copy URL.', 'danger');
+            }
+        });
+    });
+
+    document.querySelectorAll('.js-delete-file').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const fileId = Number(btn.dataset.fileId || 0);
+            const filename = String(btn.dataset.filename || 'this file');
+            if (!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
+            btn.disabled = true;
+            try {
+                const res = await apiFetch(`api/admin/files/${fileId}/delete`, { method: 'POST' });
+                showToast(res.message || 'File deleted.', 'success');
+                setTimeout(() => renderRoute(), 300);
+            } catch (err) {
+                showToast(getErrorMessage(err, 'Failed to delete file.'), 'danger');
+                btn.disabled = false;
+            }
+        });
+    });
 
     const paymentMethodForm = document.getElementById('adminPaymentMethodForm');
     const paymentMethodResult = document.getElementById('adminPaymentMethodResult');
@@ -2831,6 +3432,7 @@ function attachDashboardSidebarHandlers() {
         'admin-services': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.2 4.8L19 9l-4.8 2.2L12 16l-2.2-4.8L5 9l4.8-2.2L12 2z"/><path d="M5 18h14"/></svg>',
         'admin-areas': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-5.5 7-12a7 7 0 1 0-14 0c0 6.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
         'admin-settings': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 1 1 4 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 1 1 0 4h-.2a1 1 0 0 0-.9.6z"/></svg>',
+        'admin-files': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
         'therapist-overview': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v11h14V10"/></svg>',
         'therapist-bookings': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
         'therapist-profile': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.6-3.3 4.3-5 8-5s6.4 1.7 8 5"/></svg>',

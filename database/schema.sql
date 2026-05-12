@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS services (
     category_id BIGINT UNSIGNED NOT NULL,
     name VARCHAR(160) NOT NULL,
     description TEXT NULL,
+    image_url VARCHAR(255) NULL,
     duration_minutes INT NOT NULL DEFAULT 60,
     price DECIMAL(12,2) NOT NULL,
     is_addon TINYINT(1) NOT NULL DEFAULT 0,
@@ -197,6 +198,18 @@ CREATE TABLE IF NOT EXISTS settings (
     setting_value LONGTEXT NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uq_settings_key (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS media_files (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(80) NOT NULL,
+    file_size INT UNSIGNED NOT NULL DEFAULT 0,
+    uploaded_by BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL,
+    KEY idx_media_files_uploaded_by (uploaded_by),
+    CONSTRAINT fk_media_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO service_categories (name, description, sort_order, is_active, created_at, updated_at) VALUES

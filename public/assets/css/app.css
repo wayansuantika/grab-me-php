@@ -519,6 +519,29 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     border: 2px solid rgba(141, 187, 171, 0.5);
 }
 
+.therapist-avatar-admin-mobile {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 0;
+}
+
+.therapist-avatar-admin-table {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0;
+}
+
+.admin-therapist-photo-preview {
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    border: 1px solid #dee2e6;
+    background: #f8f9fa;
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+}
+
 .fade-stagger {
     opacity: 0;
     transform: translateY(12px);
@@ -638,6 +661,25 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 }
 
 @media (max-width: 767px) {
+    .bg-shape {
+        display: none;
+    }
+
+    /* iOS/WebKit fallback: disable sticky header to prevent scroll jitter */
+    .navbar.sticky-top {
+        position: relative;
+        top: auto;
+        z-index: 1020;
+    }
+
+    .navbar-luxury {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(255, 255, 255, 0.96);
+        transform: translateZ(0);
+        backface-visibility: hidden;
+    }
+
     .hero-card {
         padding: 1.2rem;
     }
@@ -855,6 +897,15 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     transition: all 0.2s ease;
     height: 100%;
     position: relative;
+    overflow: hidden;
+}
+
+.service-card-img {
+    display: block;
+    width: calc(100% + 1.8rem);
+    margin: -1rem -0.9rem 0.75rem;
+    height: 110px;
+    object-fit: cover;
 }
 
 .service-card-inner:hover {
@@ -1006,7 +1057,7 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 /* ── Home Redesign v2 ── */
 .hp2-hero {
     position: relative;
-    min-height: 92vh;
+    min-height: 88vh;
     display: flex;
     align-items: center;
     overflow: hidden;
@@ -1066,12 +1117,21 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     line-height: 1.75;
 }
 
-.hp2-hero-actions,
+.hp2-hero-actions{
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin-top: 1.1rem;
+}
+
+
 .hp2-final-actions {
     display: flex;
     gap: 0.65rem;
     flex-wrap: wrap;
     margin-top: 1.1rem;
+    align-content: center;
+    justify-content: center;
 }
 
 .hp2-btn-primary {
@@ -1102,16 +1162,31 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     margin-top: 1rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.45rem 0.9rem;
 }
 
-.hp2-proof-row span {
-    border-radius: 999px;
-    padding: 0.28rem 0.62rem;
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.08);
+.hp2-proof-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: rgba(255, 255, 255, 0.96);
+}
+
+.hp2-proof-icon {
+    width: 1rem;
+    height: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #8dbbab;
+}
+
+.hp2-proof-icon svg {
+    width: 100%;
+    height: 100%;
 }
 
 .hp2-intro,
@@ -2030,6 +2105,27 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 
 /* ── Responsive ── */
 @media (max-width: 991px) {
+    .hp2-hero {
+        min-height: 82vh;
+    }
+
+    .hp2-hero-card {
+        max-width: 620px;
+    }
+
+    .hp2-title {
+        font-size: clamp(2rem, 6.4vw, 3.6rem);
+    }
+
+    .hp2-sub {
+        font-size: 0.98rem;
+        line-height: 1.66;
+    }
+
+    .hp2-service-img {
+        height: 190px;
+    }
+
     .hp-gallery-grid {
         grid-template-columns: repeat(2, 1fr);
         grid-template-rows: repeat(5, 200px);
@@ -2045,11 +2141,56 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 }
 
 @media (max-width: 575px) {
-    .hp2-hero { min-height: 84vh; }
+    .hp2-hero {
+        min-height: 76vh;
+        min-height: 76svh;
+    }
 
     .hp2-hero-card {
-        padding: 1rem;
+        padding: 0.95rem;
         border-radius: 0.9rem;
+    }
+
+    .hp2-title {
+        font-size: clamp(1.75rem, 9vw, 2.3rem);
+        line-height: 1.06;
+        margin: 0.55rem 0 0.72rem;
+    }
+
+    .hp2-sub {
+        font-size: 0.92rem;
+        line-height: 1.58;
+        max-width: 100%;
+    }
+
+    .hp2-proof-row {
+        gap: 0.35rem 0.6rem;
+    }
+
+    .hp2-proof-item {
+        font-size: 0.67rem;
+        gap: 0.28rem;
+    }
+
+    .hp2-proof-icon {
+        width: 0.86rem;
+        height: 0.86rem;
+    }
+
+    .hp2-hero-actions {
+        gap: 0.5rem;
+    }
+
+    .hp2-hero-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .hp2-btn-primary,
+    .hp2-btn-secondary,
+    .hp2-btn-wa {
+        padding: 0.68rem 1.15rem;
+        font-size: 0.92rem;
     }
 
     .hp2-intro,
@@ -2063,6 +2204,33 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 
     .hp2-gallery-grid {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .hp2-service-card {
+        border-radius: 0.85rem;
+    }
+
+    .hp2-service-img {
+        height: 160px;
+    }
+
+    .hp2-service-body {
+        padding: 0.82rem;
+    }
+
+    .hp2-service-name {
+        font-size: 1.05rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .hp2-service-desc {
+        font-size: 0.82rem;
+        line-height: 1.56;
+    }
+
+    .hp2-service-meta {
+        margin-top: 0.45rem;
+        font-size: 0.68rem;
     }
 
     .hp2-gallery-item img { height: 170px; }
@@ -2635,3 +2803,62 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
         padding: 0.44rem 0.64rem;
     }
 }
+
+/* ── Admin File Manager ─────────────────────────────────────────────── */
+.admin-files-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.admin-file-card {
+    background: var(--panel-card-bg, #fff);
+    border: 1px solid var(--border-subtle, rgba(0,0,0,.08));
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s;
+}
+
+.admin-file-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+}
+
+.admin-file-thumb {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: var(--bg-muted, #f4f4f0);
+    flex-shrink: 0;
+}
+
+.admin-file-meta {
+    padding: 0.6rem 0.75rem 0.4rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-file-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-file-actions {
+    padding: 0.5rem 0.75rem 0.75rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.admin-file-actions .btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    flex: 1 1 auto;
+}
+

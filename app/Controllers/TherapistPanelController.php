@@ -292,6 +292,68 @@ class TherapistPanelController
             'id' => $therapistId,
         ]);
 
+        $pdo->prepare('INSERT INTO media_files (filename, original_name, mime_type, file_size, uploaded_by, created_at) VALUES (:filename, :original_name, :mime_type, :file_size, :uploaded_by, :created_at)')->execute([
+            'filename' => 'uploads/' . $safeName,
+            'original_name' => basename((string) $_FILES['photo']['name']),
+            'mime_type' => (string) ($_FILES['photo']['type'] ?? 'image/jpeg'),
+            'file_size' => (int) ($_FILES['photo']['size'] ?? 0),
+            'uploaded_by' => (int) Auth::id(),
+            'created_at' => now(),
+        ]);
+
         json_response(['success' => true, 'message' => 'Profile photo updated.', 'data' => ['photo_url' => $publicUrl]]);
+    }
+
+    public function listFiles(): void
+    {
+        Auth::requireRole('therapist');
+
+        try {
+            $pdo = Database::connection();
+            $stmt = $pdo->query('SELECT id, filename, original_name, mime_type, file_size, created_at FROM media_files ORDER BY created_at DESC');
+            $files = $stmt->fetchAll();
+            json_response(['success' => true, 'data' => ['files' => $files]]);
+        } catch (\Throwable $e) {
+            app_error('Therapist list files error', $e);
+            json_response(['success' => false, 'message' => 'Failed to load file library.'], 500);
+        }
+    }
+
+    public function selectProfilePhoto(): void
+    {
+        Auth::requireRole('therapist');
+
+        if (!verify_csrf()) {
+            json_response(['success' => false, 'message' => 'CSRF validation failed.'], 419);
+        }
+
+        $data = request_json();
+        $photoUrl = trim((string) ($data['photo_url'] ?? ''));
+        if ($photoUrl === '') {
+            json_response(['success' => false, 'message' => 'Photo URL is required.'], 422);
+        }
+
+        $therapistId = $this->therapistIdByUser((int) Auth::id());
+        if ($therapistId === null) {
+            json_response(['success' => false, 'message' => 'Therapist profile not found.'], 404);
+        }
+
+        if (!preg_match('#^/uploads/[A-Za-z0-9_./-]+$#', $photoUrl)) {
+            json_response(['success' => false, 'message' => 'Invalid photo URL.'], 422);
+        }
+
+        $fullPath = base_path('public' . $photoUrl);
+        if (!is_file($fullPath)) {
+            json_response(['success' => false, 'message' => 'Selected file was not found.'], 404);
+        }
+
+        $pdo = Database::connection();
+        $pdo->prepare('UPDATE therapists SET photo_url = :photo_url, updated_at = :updated_at WHERE id = :id')->execute([
+            'photo_url' => $photoUrl,
+            'updated_at' => now(),
+            'id' => $therapistId,
+        ]);
+
+        json_response(['success' => true, 'message' => 'Profile photo updated.', 'data' => ['photo_url' => $photoUrl]]);
     }
 }

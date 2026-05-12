@@ -75,10 +75,15 @@ class AdminWriteService
         $email = strtolower(trim((string) ($data['email'] ?? '')));
         $phone = trim((string) ($data['phone'] ?? ''));
         $specialty = trim((string) ($data['specialty'] ?? ''));
+        $photoUrl = trim((string) ($data['photo_url'] ?? ''));
         $experience = (int) ($data['experience_years'] ?? 0);
         $rating = (float) ($data['rating'] ?? 5);
         $isActive = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
         $password = (string) ($data['password'] ?? '');
+
+        if ($photoUrl === '') {
+            $photoUrl = null;
+        }
 
         if ($name === '' || $email === '') {
             return $this->result(false, 'Name and email are required.', 422);
@@ -121,8 +126,9 @@ class AdminWriteService
                     ]);
                 }
 
-                $pdo->prepare('UPDATE therapists SET specialty = :specialty, experience_years = :experience_years, rating = :rating, is_active = :is_active, updated_at = :updated_at WHERE id = :id')->execute([
+                $pdo->prepare('UPDATE therapists SET specialty = :specialty, photo_url = :photo_url, experience_years = :experience_years, rating = :rating, is_active = :is_active, updated_at = :updated_at WHERE id = :id')->execute([
                     'specialty' => $specialty,
+                    'photo_url' => $photoUrl,
                     'experience_years' => $experience,
                     'rating' => $rating,
                     'is_active' => $isActive,
@@ -173,9 +179,10 @@ class AdminWriteService
 
             $userId = (int) $pdo->lastInsertId();
 
-            $pdo->prepare('INSERT INTO therapists (user_id, specialty, experience_years, rating, is_active, created_at, updated_at) VALUES (:user_id, :specialty, :experience_years, :rating, :is_active, :created_at, :updated_at)')->execute([
+            $pdo->prepare('INSERT INTO therapists (user_id, specialty, photo_url, experience_years, rating, is_active, created_at, updated_at) VALUES (:user_id, :specialty, :photo_url, :experience_years, :rating, :is_active, :created_at, :updated_at)')->execute([
                 'user_id' => $userId,
                 'specialty' => $specialty,
+                'photo_url' => $photoUrl,
                 'experience_years' => $experience,
                 'rating' => $rating,
                 'is_active' => $isActive,
@@ -210,6 +217,7 @@ class AdminWriteService
             'category_id' => (int) ($data['category_id'] ?? 0),
             'name' => trim((string) ($data['name'] ?? '')),
             'description' => trim((string) ($data['description'] ?? '')),
+            'image_url' => trim((string) ($data['image_url'] ?? '')),
             'duration_minutes' => (int) ($data['duration_minutes'] ?? 60),
             'price' => (float) ($data['price'] ?? 0),
             'is_addon' => isset($data['is_addon']) ? (int) (bool) $data['is_addon'] : 0,
@@ -217,13 +225,17 @@ class AdminWriteService
             'sort_order' => (int) ($data['sort_order'] ?? 0),
         ];
 
+        if ($payload['image_url'] === '') {
+            $payload['image_url'] = null;
+        }
+
         if ($payload['category_id'] <= 0 || $payload['name'] === '' || $payload['price'] <= 0) {
             return $this->result(false, 'Category, name, and price are required.', 422);
         }
 
         $pdo = Database::connection();
         if ($id > 0) {
-            $stmt = $pdo->prepare('UPDATE services SET category_id = :category_id, name = :name, description = :description, duration_minutes = :duration_minutes, price = :price, is_addon = :is_addon, is_active = :is_active, sort_order = :sort_order, updated_at = :updated_at WHERE id = :id');
+            $stmt = $pdo->prepare('UPDATE services SET category_id = :category_id, name = :name, description = :description, image_url = :image_url, duration_minutes = :duration_minutes, price = :price, is_addon = :is_addon, is_active = :is_active, sort_order = :sort_order, updated_at = :updated_at WHERE id = :id');
             $stmt->execute(array_merge($payload, ['updated_at' => now(), 'id' => $id]));
             $this->clearAdminReadCache();
 
@@ -237,7 +249,7 @@ class AdminWriteService
             return $this->result(true, 'Service updated successfully.');
         }
 
-        $stmt = $pdo->prepare('INSERT INTO services (category_id, name, description, duration_minutes, price, is_addon, sort_order, is_active, created_at, updated_at) VALUES (:category_id, :name, :description, :duration_minutes, :price, :is_addon, :sort_order, :is_active, :created_at, :updated_at)');
+        $stmt = $pdo->prepare('INSERT INTO services (category_id, name, description, image_url, duration_minutes, price, is_addon, sort_order, is_active, created_at, updated_at) VALUES (:category_id, :name, :description, :image_url, :duration_minutes, :price, :is_addon, :sort_order, :is_active, :created_at, :updated_at)');
         $stmt->execute(array_merge($payload, ['created_at' => now(), 'updated_at' => now()]));
         $this->clearAdminReadCache();
 
@@ -249,7 +261,7 @@ class AdminWriteService
             'is_active' => $payload['is_active'],
         ], $newServiceId, 'service', $context);
 
-        return $this->result(true, 'Service created successfully.', 201);
+        return ['success' => true, 'message' => 'Service created successfully.', 'status' => 201, 'data' => ['id' => $newServiceId]];
     }
 
     public function saveArea(array $data, int $adminId, array $context = []): array
@@ -432,6 +444,11 @@ class AdminWriteService
     private function clearAdminReadCache(): void
     {
         (new FileCache())->forgetByPrefix(self::ADMIN_READ_CACHE_PREFIX);
+    }
+
+    public function clearServiceCache(): void
+    {
+        $this->clearAdminReadCache();
     }
 
     private function result(bool $success, string $message, int $status = 200): array

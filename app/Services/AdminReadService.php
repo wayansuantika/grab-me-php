@@ -35,13 +35,17 @@ class AdminReadService
     {
         return $this->cache->remember(self::CACHE_PREFIX . 'dashboard.v1', self::DASHBOARD_TTL, function (): array {
             $customerCount = $this->userRepo->countByRole('customer');
+            $pdo = Database::connection();
+            $verifiedCustomerCount = (int) $pdo->query("SELECT COUNT(DISTINCT b.user_id) FROM bookings b INNER JOIN users u ON u.id = b.user_id WHERE u.role = 'customer'")->fetchColumn();
             $therapistStats = $this->therapistRepo->getStats();
             $bookingStats = $this->bookingRepo->getStats();
             $paymentStats = $this->paymentService->getPaymentStats();
 
             $metrics = [
                 'operations' => [
-                    'customers_total' => $customerCount,
+                    'customers_total' => $verifiedCustomerCount,
+                    'customers_registered_total' => $customerCount,
+                    'customers_with_bookings_total' => $verifiedCustomerCount,
                     'therapists_total' => (int) ($therapistStats['total_therapists'] ?? 0),
                     'therapists_active' => (int) ($therapistStats['active_therapists'] ?? 0),
                     'bookings_total' => (int) ($bookingStats['total'] ?? 0),
@@ -87,7 +91,7 @@ class AdminReadService
 
             return [
                 'categories' => $pdo->query('SELECT id, name FROM service_categories WHERE is_active = 1 ORDER BY sort_order ASC, id ASC')->fetchAll(),
-                'services' => $pdo->query('SELECT s.id, s.name, s.category_id, c.name AS category_name, s.description, s.duration_minutes, s.price, s.is_addon, s.sort_order, s.is_active FROM services s INNER JOIN service_categories c ON c.id = s.category_id ORDER BY s.id DESC')->fetchAll(),
+                'services' => $pdo->query('SELECT s.id, s.name, s.category_id, c.name AS category_name, s.description, s.image_url, s.duration_minutes, s.price, s.is_addon, s.sort_order, s.is_active FROM services s INNER JOIN service_categories c ON c.id = s.category_id ORDER BY s.id DESC')->fetchAll(),
             ];
         });
     }

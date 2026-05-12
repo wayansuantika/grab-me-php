@@ -39,6 +39,7 @@ $routes = [
         '#^/api/therapist/dashboard$#' => [TherapistPanelController::class, 'dashboard'],
         '#^/api/therapist/bookings$#' => [TherapistPanelController::class, 'bookings'],
         '#^/api/therapist/profile$#' => [TherapistPanelController::class, 'profile'],
+        '#^/api/therapist/files$#' => [TherapistPanelController::class, 'listFiles'],
         '#^/api/admin/dashboard$#' => [AdminController::class, 'dashboard'],
         '#^/api/admin/bookings$#' => [AdminController::class, 'bookings'],
         '#^/api/admin/therapists$#' => [AdminController::class, 'therapists'],
@@ -47,6 +48,7 @@ $routes = [
         '#^/api/admin/customers$#' => [AdminController::class, 'customers'],
         '#^/api/admin/payments$#' => [AdminController::class, 'payments'],
         '#^/api/admin/audit$#' => [AdminController::class, 'audits'],
+        '#^/api/admin/files$#' => [AdminController::class, 'listFiles'],
         '#^/api/settings$#' => [SettingsController::class, 'get'],
     ],
     'POST' => [
@@ -58,6 +60,7 @@ $routes = [
         '#^/api/payments/webhook$#' => [PaymentController::class, 'webhook'],
         '#^/api/therapist/schedule$#' => [TherapistPanelController::class, 'updateSchedule'],
         '#^/api/therapist/profile-photo$#' => [TherapistPanelController::class, 'updateProfilePhoto'],
+        '#^/api/therapist/profile-photo/select$#' => [TherapistPanelController::class, 'selectProfilePhoto'],
         '#^/api/therapist/profile$#' => [TherapistPanelController::class, 'updateProfile'],
         '#^/api/therapist/availability$#' => [TherapistPanelController::class, 'setAvailability'],
         '#^/api/admin/therapists/save$#' => [AdminController::class, 'saveTherapist'],
@@ -66,6 +69,9 @@ $routes = [
         '#^/api/admin/areas/save$#' => [AdminController::class, 'saveArea'],
         '#^/api/admin/payments/confirm$#' => [AdminController::class, 'confirmPayment'],
         '#^/api/admin/bookings/cancel$#' => [AdminController::class, 'cancelBooking'],
+        '#^/api/admin/files/upload$#' => [AdminController::class, 'uploadFile'],
+        '#^/api/admin/files/(\d+)/delete$#' => [AdminController::class, 'deleteFile'],
+        '#^/api/admin/services/(\d+)/image$#' => [AdminController::class, 'uploadServiceImage'],
         '#^/api/admin/settings$#' => [SettingsController::class, 'save'],
     ],
 ];
@@ -118,6 +124,7 @@ $jsVersion = (string) (@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
             <div class="header-note d-none d-lg-flex">Bali Home Service Spa</div>
             <a class="navbar-brand" href="#/home">GrabMas</a>
             <div class="nav-right d-flex align-items-center gap-2 ms-auto">
+                <div data-nav="booking"><a href="#/booking" class="btn btn-sm btn-book rounded-pill px-3">Book</a></div>
                 <div data-nav="contact"><a href="#/contact" class="btn btn-sm btn-outline-dark rounded-pill px-3 d-none d-md-inline-flex">Concierge</a></div>
                 <div class="d-none" data-nav="logout"><a href="#" id="navLogout" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Logout</a></div>
             </div>
