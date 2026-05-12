@@ -24,7 +24,7 @@ class PaymentService
         $pdo = Database::connection();
         $provider = strtolower(trim($method));
 
-        if (!in_array($provider, ['bank_transfer', 'stripe', 'credit_card'])) {
+        if (!in_array($provider, ['bank_transfer', 'stripe', 'credit_card', 'paypal'])) {
             return ['success' => false, 'message' => 'Invalid payment method.'];
         }
 
@@ -221,19 +221,37 @@ class PaymentService
 
         $stmt = $pdo->prepare('
             SELECT
-                COUNT(id) AS total_payments,
-                SUM(CASE WHEN status = :succeeded THEN amount ELSE 0 END) AS total_collected,
-                SUM(CASE WHEN status = :pending THEN amount ELSE 0 END) AS total_pending,
-                SUM(CASE WHEN status = :failed THEN amount ELSE 0 END) AS total_failed,
-                COUNT(DISTINCT booking_id) AS unique_bookings
-            FROM payments
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                (SELECT COUNT(p.id) FROM payments p) AS total_payments,
+                (SELECT COUNT(DISTINCT p.booking_id) FROM payments p) AS unique_bookings,
+                (
+                    SELECT COALESCE(SUM(b.total_amount), 0)
+                    FROM bookings b
+                    WHERE b.payment_status = :paid_booking_status
+                      AND b.booking_status <> :cancelled_status
+                ) AS total_collected,
+                (
+                    SELECT COALESCE(SUM(b.total_amount), 0)
+                    FROM bookings b
+                    WHERE b.payment_status IN (:pending_booking_status, :processing_booking_status)
+                      AND b.booking_status IN (:pending_payment_status, :confirmed_status)
+                ) AS total_pending,
+                (
+                    SELECT COALESCE(SUM(b.total_amount), 0)
+                    FROM bookings b
+                    WHERE b.payment_status = :failed_booking_status
+                      AND b.booking_status <> :cancelled_status_failed
+                ) AS total_failed
         ');
 
         $stmt->execute([
-            'succeeded' => 'succeeded',
-            'pending' => 'pending',
-            'failed' => 'failed',
+            'paid_booking_status' => 'paid',
+            'pending_booking_status' => 'pending',
+            'processing_booking_status' => 'processing',
+            'failed_booking_status' => 'failed',
+            'pending_payment_status' => 'pending_payment',
+            'confirmed_status' => 'confirmed',
+            'cancelled_status' => 'cancelled',
+            'cancelled_status_failed' => 'cancelled',
         ]);
 
         return $stmt->fetch() ?: [];

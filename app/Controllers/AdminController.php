@@ -176,6 +176,15 @@ class AdminController
         json_response(['success' => $result['success'], 'message' => $result['message']], (int) $result['status']);
     }
 
+    public function syncStripePayment(): void
+    {
+        Auth::requireRole('admin');
+        $this->ensureCsrf();
+
+        $result = $this->adminWriteService->syncStripePayment(request_json(), (int) Auth::id(), $this->auditContext());
+        json_response(['success' => $result['success'], 'message' => $result['message']], (int) $result['status']);
+    }
+
     public function cancelBooking(): void
     {
         Auth::requireRole('admin');

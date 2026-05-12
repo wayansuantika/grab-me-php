@@ -64,7 +64,13 @@ async function apiFetch(url, options = {}) {
     }
 
     if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
+        const validationErrors = data && typeof data === 'object' && data.errors && typeof data.errors === 'object'
+            ? Object.values(data.errors).filter(Boolean)
+            : [];
+        const errorMessage = validationErrors.length > 0
+            ? validationErrors.join(' ')
+            : (data.message || `Request failed (${response.status})`);
+        throw new Error(errorMessage);
     }
 
     return data;
@@ -214,15 +220,42 @@ function applyRoleNavigation() {
 }
 
 function bookingStatusBadge(status) {
+    const value = String(status || '').toLowerCase();
+    const isCancelled = value === 'cancelled' || value === 'canceled';
     const map = {
         pending_payment: 'bg-warning-subtle text-warning-emphasis',
         confirmed: 'bg-success-subtle text-success-emphasis',
         in_progress: 'bg-info-subtle text-info-emphasis',
         completed: 'bg-primary-subtle text-primary-emphasis',
-        cancelled: 'bg-danger-subtle text-danger-emphasis',
+        cancelled: 'bg-secondary-subtle text-secondary-emphasis',
+        canceled: 'bg-secondary-subtle text-secondary-emphasis',
     };
 
-    return `<span class="badge ${map[status] || 'bg-secondary-subtle text-secondary-emphasis'}">${(status || '').replace('_', ' ')}</span>`;
+    return `<span class="badge ${map[value] || 'bg-secondary-subtle text-secondary-emphasis'} ${isCancelled ? 'badge-cancelled' : ''}">${(status || '').replace('_', ' ')}</span>`;
+}
+
+function isCancelledBooking(status) {
+    const value = String(status || '').toLowerCase();
+    return value === 'cancelled' || value === 'canceled';
+}
+
+function paymentStatusBadge(status, bookingStatus = '') {
+    const value = String(status || '').toLowerCase();
+    const forceNeutral = isCancelledBooking(bookingStatus) || value === 'failed';
+    const map = {
+        pending: 'bg-warning-subtle text-warning-emphasis',
+        processing: 'bg-info-subtle text-info-emphasis',
+        paid: 'bg-success-subtle text-success-emphasis',
+        succeeded: 'bg-success-subtle text-success-emphasis',
+        failed: 'bg-secondary-subtle text-secondary-emphasis',
+        refunded: 'bg-secondary-subtle text-secondary-emphasis',
+    };
+
+    const badgeClass = forceNeutral
+        ? 'bg-secondary-subtle text-secondary-emphasis'
+        : (map[value] || 'bg-secondary-subtle text-secondary-emphasis');
+
+    return `<span class="badge ${badgeClass}">${value.replace('_', ' ') || 'unknown'}</span>`;
 }
 
 async function loadMe() {
@@ -640,14 +673,17 @@ async function bookingTemplate() {
     const areas = areasRes?.data?.areas || [];
     const settings = settingsRes?.data?.settings || {};
     const bankTransferDetails = settings.bank_transfer_details || 'Bank Transfer\\nBank: BCA\\nAccount Name: GrabMas Spa\\nAccount Number: 1234567890';
-    const stripeEnabled = Boolean(window.APP_BOOTSTRAP?.stripeEnabled);
     const bankTransferEnabled = String(settings.payment_bank_transfer_enabled ?? '1') === '1';
-    const creditCardEnabledByAdmin = String(settings.payment_credit_card_enabled ?? '1') === '1';
-    const creditCardEnabled = stripeEnabled && creditCardEnabledByAdmin;
+    const creditCardEnabled = String(settings.payment_credit_card_enabled ?? '1') === '1';
     const hasPaymentMethod = bankTransferEnabled || creditCardEnabled;
 
     const mainServices = [];
     const addons = [];
+    const escapeAttr = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     (serviceRes?.data?.categories || []).forEach((cat) => {
         (cat.services || []).forEach((s) => {
             if (s.is_addon) addons.push(s);
@@ -657,197 +693,268 @@ async function bookingTemplate() {
 
     const today = new Date().toISOString().split('T')[0];
 
+    let openHours = { start: '09:00', end: '21:00' };
+    if (settings.open_hours) {
+        try {
+            const parsed = typeof settings.open_hours === 'string' ? JSON.parse(settings.open_hours) : settings.open_hours;
+            if (parsed && parsed.start && parsed.end) openHours = parsed;
+        } catch {}
+    }
+
     return `
         <section class="booking-wizard">
-
-            <div class="booking-hero mb-4">
-                <p class="pill mb-2">Reserve Your Session</p>
-                <h2 class="section-title">Book a Home Spa Treatment</h2>
-                <p class="text-muted">Luxury wellness delivered to your Bali villa or hotel — in four simple steps.</p>
+            <!-- Modern Progress Bar -->
+            <div class="booking-progress-bar" id="bookingProgressBar">
+                <div class="progress-fill"></div>
             </div>
 
-            <div class="booking-steps mb-4" id="bookingStepBar">
-                <div class="booking-step active" data-step="1"><div class="step-num">1</div><div class="step-label">Location & Time</div></div>
-                <div class="step-line"></div>
-                <div class="booking-step" data-step="2"><div class="step-num">2</div><div class="step-label">Services</div></div>
-                <div class="step-line"></div>
-                <div class="booking-step" data-step="3"><div class="step-num">3</div><div class="step-label">Therapist</div></div>
-                <div class="step-line"></div>
-                <div class="booking-step" data-step="4"><div class="step-num">4</div><div class="step-label">Your Details</div></div>
+            <!-- Step Indicator Pills -->
+            <div class="booking-progress-pills" id="bookingStepBar">
+                <div class="progress-pill active" data-step="1">
+                    <span class="pill-number">1</span>
+                    <span class="pill-label">Location</span>
+                </div>
+                <div class="progress-pill" data-step="2">
+                    <span class="pill-number">2</span>
+                    <span class="pill-label">Services</span>
+                </div>
+                <div class="progress-pill" data-step="3">
+                    <span class="pill-number">3</span>
+                    <span class="pill-label">Therapist</span>
+                </div>
+                <div class="progress-pill" data-step="4">
+                    <span class="pill-number">4</span>
+                    <span class="pill-label">Details</span>
+                </div>
             </div>
 
-            <form id="bookingForm" novalidate>
+            <form id="bookingForm" novalidate class="booking-form-container">
                 <input type="hidden" name="therapist_id" id="bookingTherapistId">
 
                 <!-- Step 1: Location & Time -->
-                <div class="booking-panel active" id="bookStep1">
-                    <div class="hero-card">
-                        <h4 class="section-title mb-4">Where &amp; When</h4>
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label fw-semibold mb-2">Coverage Area</label>
-                                <div class="row g-2">
-                                    ${areas.map((a) => `
-                                        <div class="col-6 col-md-4 col-lg-3">
-                                            <label class="area-card">
-                                                <input type="radio" name="area_id" value="${a.id}" class="d-none" required>
-                                                <div class="area-card-inner">
-                                                    <span class="area-icon">📍</span>
-                                                    <span>${a.name}</span>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Preferred Date</label>
-                                <input type="date" class="form-control form-control-lg" name="booking_date" min="${today}" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Preferred Time</label>
-                                <input type="time" class="form-control form-control-lg" name="booking_time" required>
+                <div class="booking-step-panel active" id="bookStep1" data-step="1">
+                    <div class="step-content">
+                        <div class="step-header">
+                            <h3>Where & When</h3>
+                            <p>Select your area and preferred date & time</p>
+                        </div>
+
+                        <div class="form-section">
+                            <label class="form-label">Coverage Area</label>
+                            <div class="area-selector">
+                                ${areas.map((a) => `
+                                    <label class="area-option">
+                                        <input type="radio" name="area_id" value="${a.id}" class="d-none" required>
+                                        <span class="area-badge">
+                                            <span class="area-icon">📍</span>
+                                            <span class="area-name">${a.name}</span>
+                                        </span>
+                                    </label>
+                                `).join('')}
                             </div>
                         </div>
-                        <div class="step-footer">
-                            <span></span>
-                            <button type="button" class="btn btn-luxury btn-next-step" data-next="2">Services →</button>
+
+                        <div class="mb-2">
+                            <!-- Open hours minimalized: show inline with time input below -->
+                        </div>
+                        <div class="form-section-row">
+                            <div class="form-section flex-1">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control form-control-modern" name="booking_date" min="${today}" required>
+                            </div>
+                            <div class="form-section flex-1">
+                                <label class="form-label">Time</label>
+                                <input type="time" class="form-control form-control-modern" name="booking_time" required>
+                            </div>
+                        </div>
+
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-next-step" data-next="2">Continue</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Step 2: Services -->
-                <div class="booking-panel" id="bookStep2">
-                    <div class="hero-card">
-                        <h4 class="section-title mb-1">Choose Your Treatment</h4>
-                        <p class="text-muted small mb-4">Tap cards to select. You may choose multiple services.</p>
+                <div class="booking-step-panel" id="bookStep2" data-step="2">
+                    <div class="step-content">
+                        <div class="step-header">
+                            <h3>Choose Treatments</h3>
+                            <p>Select one or more services</p>
+                        </div>
 
-                        <h6 class="label-section">Main Services</h6>
-                        <div class="service-grid mb-4">
-                            ${mainServices.map((s) => {
-                                const imgUrl = s.image_url ? apiUrl(s.image_url.replace(/^\//, '')) : '';
-                                return `<label class="service-card">
-                                    <input type="checkbox" class="d-none service-check" value="${s.id}" data-price="${s.price}" data-name="${s.name}">
-                                    <div class="service-card-inner">
-                                        ${imgUrl ? `<img src="${imgUrl}" alt="${s.name}" class="service-card-img">` : ''}
-                                        <div class="service-name">${s.name}</div>
-                                        <div class="small text-muted mb-1">${s.duration_minutes} min</div>
-                                        <div class="service-price">${money(s.price)}</div>
-                                        <div class="service-check-mark">✓</div>
-                                    </div>
-                                </label>`;
-                            }).join('')}
+                        <div class="form-section">
+                            <label class="form-label">Main Services</label>
+                            <div class="service-grid-modern">
+                                ${mainServices.map((s) => {
+                                    const imgUrl = s.image_url ? apiUrl(s.image_url.replace(/^\//, '')) : '';
+                                    const details = s.description || 'Treatment details are not available for this service yet.';
+                                    const safeName = escapeAttr(s.name);
+                                    const safeDetails = escapeAttr(details);
+                                    return `<label class="service-option">
+                                        <input type="checkbox" class="d-none service-check" value="${s.id}" data-price="${s.price}" data-name="${s.name}">
+                                        <div class="service-card-modern">
+                                            <div class="service-media">
+                                                ${imgUrl ? `<img src="${imgUrl}" alt="${s.name}" class="service-image">` : '<div class="service-placeholder">📷</div>'}
+                                                <button type="button" class="service-info-btn" data-service-name="${safeName}" data-service-detail="${safeDetails}" data-service-duration="${s.duration_minutes}" data-service-price="${s.price}" aria-label="View treatment details">i</button>
+                                            </div>
+                                            <div class="service-info">
+                                                <h5>${s.name}</h5>
+                                                <span class="service-duration">${s.duration_minutes} min</span>
+                                            </div>
+                                            <div class="service-footer">
+                                                <span class="service-price">${money(s.price)}</span>
+                                                <div class="service-checkbox"></div>
+                                            </div>
+                                        </div>
+                                    </label>`;
+                                }).join('')}
+                            </div>
                         </div>
 
                         ${addons.length ? `
-                        <h6 class="label-section">Optional Add-Ons</h6>
-                        <div class="service-grid">
-                            ${addons.map((s) => {
-                                const imgUrl = s.image_url ? apiUrl(s.image_url.replace(/^\//, '')) : '';
-                                return `<label class="service-card addon-card">
-                                    <input type="checkbox" class="d-none addon-check" value="${s.id}" data-price="${s.price}" data-name="${s.name}">
-                                    <div class="service-card-inner">
-                                        ${imgUrl ? `<img src="${imgUrl}" alt="${s.name}" class="service-card-img">` : ''}
-                                        <div class="service-name">${s.name}</div>
-                                        <div class="small text-muted mb-1">${s.duration_minutes} min</div>
-                                        <div class="service-price">${money(s.price)}</div>
-                                        <div class="service-check-mark">✓</div>
-                                    </div>
-                                </label>`;
-                            }).join('')}
+                        <div class="form-section">
+                            <label class="form-label">Add-Ons</label>
+                            <div class="service-grid-modern">
+                                ${addons.map((s) => {
+                                    const imgUrl = s.image_url ? apiUrl(s.image_url.replace(/^\//, '')) : '';
+                                    const details = s.description || 'Treatment details are not available for this add-on yet.';
+                                    const safeName = escapeAttr(s.name);
+                                    const safeDetails = escapeAttr(details);
+                                    return `<label class="service-option">
+                                        <input type="checkbox" class="d-none addon-check" value="${s.id}" data-price="${s.price}" data-name="${s.name}">
+                                        <div class="service-card-modern addon">
+                                            <div class="service-media">
+                                                ${imgUrl ? `<img src="${imgUrl}" alt="${s.name}" class="service-image">` : '<div class="service-placeholder">⭐</div>'}
+                                                <button type="button" class="service-info-btn" data-service-name="${safeName}" data-service-detail="${safeDetails}" data-service-duration="${s.duration_minutes}" data-service-price="${s.price}" aria-label="View treatment details">i</button>
+                                            </div>
+                                            <div class="service-info">
+                                                <h5>${s.name}</h5>
+                                                <span class="service-duration">${s.duration_minutes} min</span>
+                                            </div>
+                                            <div class="service-footer">
+                                                <span class="service-price">${money(s.price)}</span>
+                                                <div class="service-checkbox"></div>
+                                            </div>
+                                        </div>
+                                    </label>`;
+                                }).join('')}
+                            </div>
                         </div>
                         ` : ''}
 
-                        <div class="step-footer mt-4">
-                            <button type="button" class="btn btn-outline-secondary btn-prev-step" data-prev="1">← Back</button>
-                            <span class="text-muted small" id="serviceCount">0 selected</span>
-                            <button type="button" class="btn btn-luxury btn-next-step" data-next="3">Therapist →</button>
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-secondary btn-prev-step" data-prev="1">Back</button>
+                            <button type="button" class="btn btn-next-step" data-next="3">Continue</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Step 3: Therapist (dynamically loaded by area) -->
-                <div class="booking-panel" id="bookStep3">
-                    <div class="hero-card">
-                        <h4 class="section-title mb-1">Choose Your Therapist</h4>
-                        <p class="text-muted small mb-4">All therapists are certified and background-verified.</p>
-                        <div id="therapistPickGrid" class="therapist-pick-grid">
-                            <p class="text-muted small">Loading therapists…</p>
+                <!-- Step 3: Therapist -->
+                <div class="booking-step-panel" id="bookStep3" data-step="3">
+                    <div class="step-content">
+                        <div class="step-header">
+                            <h3>Choose Therapist</h3>
+                            <p>All therapists are certified and verified</p>
                         </div>
-                        <div class="step-footer mt-4">
-                            <button type="button" class="btn btn-outline-secondary btn-prev-step" data-prev="2">← Back</button>
-                            <button type="button" class="btn btn-luxury btn-next-step" data-next="4">Your Details →</button>
+
+                        <div class="form-section">
+                            <div id="therapistPickGrid" class="therapist-grid-modern">
+                                <p class="text-muted">Loading therapists…</p>
+                            </div>
+                        </div>
+
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-secondary btn-prev-step" data-prev="2">Back</button>
+                            <button type="button" class="btn btn-next-step" data-next="4">Continue</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Step 4: Details + Summary -->
-                <div class="booking-panel" id="bookStep4">
-                    <div class="row g-4 align-items-start">
-                        <div class="col-lg-7">
-                            <div class="hero-card">
-                                <h4 class="section-title mb-3">Your Details</h4>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Full Name</label>
-                                        <input type="text" class="form-control" name="customer_name" placeholder="As on ID" required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Phone / WhatsApp</label>
-                                        <input type="text" class="form-control" name="customer_phone" placeholder="+62…" required>
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label fw-semibold">Villa / Hotel Address</label>
-                                        <input type="text" class="form-control" name="customer_address" placeholder="Full address for therapist arrival">
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label fw-semibold">Notes for Therapist</label>
-                                        <textarea class="form-control" name="notes" rows="3" placeholder="Allergies, preferences, access instructions…"></textarea>
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label fw-semibold mb-2">Payment Method</label>
-                                        <div class="d-flex gap-3 flex-wrap" id="paymentMethodGroup">
-                                            <label class="service-card m-0" style="max-width:260px;">
-                                                <input type="radio" class="d-none" name="payment_method" value="bank_transfer" ${bankTransferEnabled ? '' : 'disabled'} ${bankTransferEnabled ? 'checked' : ''}>
-                                                <div class="service-card-inner">
-                                                    <div class="service-name">Bank Transfer</div>
-                                                    <div class="small text-muted">${bankTransferEnabled ? 'Manual transfer, then send proof.' : 'Temporarily disabled by admin.'}</div>
-                                                </div>
-                                            </label>
-                                            <label class="service-card m-0" style="max-width:260px;">
-                                                <input type="radio" class="d-none" name="payment_method" value="credit_card" ${creditCardEnabled ? '' : 'disabled'} ${!bankTransferEnabled && creditCardEnabled ? 'checked' : ''}>
-                                                <div class="service-card-inner">
-                                                    <div class="service-name">Credit Card (Stripe)</div>
-                                                    <div class="small text-muted">${creditCardEnabled ? 'Secure card payment via Stripe.' : (creditCardEnabledByAdmin ? 'Temporarily unavailable (Stripe key not set).' : 'Temporarily disabled by admin.')}</div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                        ${hasPaymentMethod ? '' : '<div class="form-text text-danger mt-1">No payment method is currently available. Please contact admin.</div>'}
-                                        <div id="bankTransferDetailsBox" class="alert alert-light border mt-2 mb-0 small" style="white-space: pre-line;">${bankTransferDetails}</div>
-                                    </div>
-                                </div>
-                                <div class="step-footer mt-4">
-                                    <button type="button" class="btn btn-outline-secondary btn-prev-step" data-prev="3">← Back</button>
-                                    <button class="btn btn-luxury px-4" type="submit">Confirm &amp; Pay</button>
-                                </div>
-                            </div>
+                <!-- Step 4: Details -->
+                <div class="booking-step-panel" id="bookStep4" data-step="4">
+                    <div class="step-content">
+                        <div class="step-header">
+                            <h3>Your Details</h3>
+                            <p>Complete your booking</p>
                         </div>
-                        <div class="col-lg-5">
-                            <div class="booking-summary panel-card">
-                                <h5 class="mb-3">Order Summary</h5>
-                                <div class="summary-row"><span class="text-muted">Area</span><span id="sumArea">—</span></div>
-                                <div class="summary-row"><span class="text-muted">Date &amp; Time</span><span id="sumDateTime">—</span></div>
-                                <div class="summary-row"><span class="text-muted">Therapist</span><span id="sumTherapist">—</span></div>
-                                <hr class="my-2">
-                                <div id="summaryServices" class="mb-2 small"></div>
-                                <div class="summary-row total-row mt-2"><span>Estimated Total</span><strong id="sumTotal">—</strong></div>
+
+                        <div class="form-section">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" class="form-control form-control-modern" name="customer_name" placeholder="As on your ID" required>
+                        </div>
+
+                        <div class="form-section">
+                            <label class="form-label">Phone / WhatsApp</label>
+                            <input type="text" class="form-control form-control-modern" name="customer_phone" placeholder="+62…" required>
+                        </div>
+
+                        <div class="form-section">
+                            <label class="form-label">Villa / Hotel Address</label>
+                            <input type="text" class="form-control form-control-modern" name="customer_address" placeholder="Full address" required>
+                        </div>
+
+                        <div class="form-section">
+                            <label class="form-label">Special Notes</label>
+                            <textarea class="form-control form-control-modern" name="notes" rows="3" placeholder="Allergies, preferences, etc."></textarea>
+                        </div>
+
+                        <div class="form-section">
+                            <label class="form-label">Payment Method</label>
+                            <div class="payment-options">
+                                <label class="payment-option" id="paymentMethodGroup">
+                                    <input type="radio" class="d-none" name="payment_method" value="bank_transfer" ${bankTransferEnabled ? '' : 'disabled'} ${bankTransferEnabled ? 'checked' : ''}>
+                                    <div class="payment-card">
+                                        <span class="payment-name">Bank Transfer</span>
+                                        <span class="payment-desc">${bankTransferEnabled ? 'Manual transfer' : 'Not available'}</span>
+                                    </div>
+                                </label>
+                                <label class="payment-option">
+                                    <input type="radio" class="d-none" name="payment_method" value="credit_card" ${creditCardEnabled ? '' : 'disabled'} ${!bankTransferEnabled && creditCardEnabled ? 'checked' : ''}>
+                                    <div class="payment-card">
+                                        <span class="payment-name">Credit Card</span>
+                                        <span class="payment-desc">${creditCardEnabled ? 'via Stripe' : 'Not available'}</span>
+                                    </div>
+                                </label>
                             </div>
+                            ${hasPaymentMethod ? '' : '<div class="form-text text-danger">No payment method available.</div>'}
+                            <div id="bankTransferDetailsBox" class="alert alert-light border mt-3 small" style="white-space: pre-line;">${bankTransferDetails}</div>
+                        </div>
+
+                        <!-- Order Summary -->
+                        <div class="order-summary">
+                            <h5>Order Summary</h5>
+                            <div class="summary-item"><span class="summary-label">Area</span><span class="summary-value" id="sumArea">—</span></div>
+                            <div class="summary-item"><span class="summary-label">Date & Time</span><span class="summary-value" id="sumDateTime">—</span></div>
+                            <div class="summary-item"><span class="summary-label">Therapist</span><span class="summary-value" id="sumTherapist">—</span></div>
+                            <div id="summaryServices" class="my-2"></div>
+                            <div class="summary-divider"></div>
+                            <div class="summary-total"><span>Estimated Total</span><strong id="sumTotal">—</strong></div>
+                        </div>
+
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-secondary btn-prev-step" data-prev="3">Back</button>
+                            <button class="btn btn-primary" type="submit">Confirm & Pay</button>
                         </div>
                     </div>
                 </div>
             </form>
 
             <div id="bookingResult" class="mt-3"></div>
+
+            <div class="modal fade" id="serviceDetailModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content service-detail-modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="serviceDetailTitle">Treatment Details</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="service-detail-meta" id="serviceDetailMeta"></div>
+                            <p class="service-detail-text mb-0" id="serviceDetailText"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
     `;
 }
@@ -998,7 +1105,7 @@ async function therapistPanelTemplate() {
                     <section class="hero-card">
                         <h3 class="section-title">My Bookings</h3>
                         <div class="d-grid gap-2 d-lg-none">
-                            ${bookings.map((b) => `<div class="panel-card therapist-mobile-card">
+                            ${bookings.map((b) => `<div class="panel-card therapist-mobile-card ${isCancelledBooking(b.booking_status) ? 'is-cancelled-text' : ''}">
                                 <div class="d-flex justify-content-between align-items-start gap-2">
                                     <div class="fw-semibold">${b.booking_code}</div>
                                     ${bookingStatusBadge(b.booking_status)}
@@ -1008,7 +1115,7 @@ async function therapistPanelTemplate() {
                                 <div class="small text-muted mt-1" style="white-space:pre-line">${b.order_details || '-'}</div>
                                 <div class="small mt-2 d-flex justify-content-between align-items-center gap-2">
                                     <span class="fw-semibold">${money(b.total_amount)}</span>
-                                    <span>${bookingStatusBadge(b.payment_status)}</span>
+                                    <span>${paymentStatusBadge(b.payment_status, b.booking_status)}</span>
                                 </div>
                                 <div class="mt-3 d-flex">
                                     <button class="btn btn-outline-secondary btn-sm w-100 js-view-booking-therapist" data-booking='${JSON.stringify(b).replace(/'/g,"&#39;")}'>View Details</button>
@@ -1019,13 +1126,13 @@ async function therapistPanelTemplate() {
                             <table class="table table-sm align-middle mb-0">
                                 <thead><tr><th>Code</th><th>Date</th><th>Customer</th><th>Services</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr></thead>
                                 <tbody>
-                                    ${bookings.map((b) => `<tr>
+                                    ${bookings.map((b) => `<tr class="${isCancelledBooking(b.booking_status) ? 'is-cancelled-row' : ''}">
                                         <td><span class="fw-semibold">${b.booking_code}</span></td>
                                         <td>${b.booking_date}<div class="small text-muted">${b.booking_time}</div></td>
                                         <td>${b.customer_name}<div class="small text-muted">${b.customer_phone}</div></td>
                                         <td class="small" style="white-space:pre-line;max-width:140px">${b.order_details || '-'}</td>
                                         <td>${money(b.total_amount)}</td>
-                                        <td>${bookingStatusBadge(b.payment_status)}</td>
+                                        <td>${paymentStatusBadge(b.payment_status, b.booking_status)}</td>
                                         <td>${bookingStatusBadge(b.booking_status)}</td>
                                         <td><button class="btn btn-outline-secondary btn-sm js-view-booking-therapist" data-booking='${JSON.stringify(b).replace(/'/g,"&#39;")}'>View</button></td>
                                     </tr>`).join('') || '<tr><td colspan="8">No bookings found.</td></tr>'}
@@ -1140,16 +1247,26 @@ async function adminPanelTemplate() {
     const bookings = bookingsRes?.data?.bookings || [];
     const payments = paymentsRes?.data?.payments || [];
     const auditLogs = auditRes?.data?.logs || [];
+    window.__auditLogsCache = auditLogs;
     const auditPagination = auditRes?.data?.pagination || {};
     const siteSettings = settingsRes?.data?.settings || {};
     const mediaFiles = filesRes?.data?.files || [];
-    const customersTotal = Number(operations.customers_total ?? s.customers ?? 0);
-    const customersRegisteredTotal = Number(operations.customers_registered_total ?? customersTotal);
     const therapistsTotal = Number(operations.therapists_total ?? s.therapists ?? 0);
     const therapistsActive = Number(operations.therapists_active ?? 0);
     const bookingsTotal = Number(operations.bookings_total ?? s.bookings ?? 0);
     const collectedAmount = Number(finance.payments_collected_amount ?? s.total_revenue ?? s.payments_paid ?? 0);
     const pendingAmount = Number(finance.payments_pending_amount ?? s.payments_pending ?? 0);
+    const pendingBookings = bookings.filter((b) => {
+        if (isCancelledBooking(b.booking_status)) return false;
+        const status = String(b.payment_status || '').toLowerCase();
+        return status === 'pending' || status === 'processing';
+    }).length;
+    const failedPayments = bookings.filter((b) => {
+        if (isCancelledBooking(b.booking_status)) return false;
+        return String(b.payment_status || '').toLowerCase() === 'failed';
+    }).length;
+    const pendingPillClass = failedPayments > 0 ? 'is-danger' : (pendingBookings > 0 ? 'is-alert' : 'is-ok');
+    const todayLabel = new Date().toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
     const weekBookings = bookingSummary.reduce((sum, day) => sum + Number(day.bookings || 0), 0);
     const weekRevenue = bookingSummary.reduce((sum, day) => sum + Number(day.revenue || 0), 0);
     const peakDay = bookingSummary.reduce((best, day) => {
@@ -1177,23 +1294,32 @@ async function adminPanelTemplate() {
                 <button class="sidebar-link" data-panel-target="admin-files">File</button>
             </aside>
 
-            <div class="dashboard-content">
+            <div class="dashboard-content admin-workspace">
+                <section class="admin-toolbar-row">
+                    <div>
+                        <h1 class="admin-toolbar-title">Admin</h1>
+                        <p class="admin-toolbar-subtitle">Store-style operations workspace for bookings, payments, and team.</p>
+                    </div>
+                    <div class="admin-toolbar-meta">
+                        <span class="admin-meta-pill">${todayLabel}</span>
+                        <span class="admin-meta-pill ${pendingPillClass}">${pendingBookings} pending payments${failedPayments > 0 ? ` · ${failedPayments} failed` : ''}</span>
+                    </div>
+                </section>
                 <section id="admin-overview" class="panel-section active">
                     <section class="hero-card admin-index mb-3">
                         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                             <div>
                                 <h2 class="section-title mb-1">Operations Command Center</h2>
-                                <p class="text-muted mb-0">Monitor customers, therapists, bookings, and revenue from one screen.</p>
+                                <p class="text-muted mb-0">Monitor therapists, bookings, payments, and revenue from one screen.</p>
                             </div>
                             <div class="pill">Live Data Snapshot</div>
                         </div>
                     </section>
 
                     <section class="row g-3 mb-3 admin-metrics">
-                        <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Customers (With Booking)</div><div class="stat-value">${customersTotal}</div><div class="small text-muted mt-1">Registered ${customersRegisteredTotal}</div></div></div>
-                        <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Total Therapists</div><div class="stat-value">${therapistsTotal}</div><div class="small text-muted mt-1">${therapistsActive} active</div></div></div>
-                        <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Total Bookings</div><div class="stat-value">${bookingsTotal}</div></div></div>
-                        <div class="col-6 col-lg-3"><div class="panel-card stat-card admin"><div class="small text-muted">Collected Revenue</div><div class="stat-value">${money(collectedAmount)}</div><div class="small text-muted mt-1">Pending ${money(pendingAmount)}</div></div></div>
+                        <div class="col-6 col-lg-4"><div class="panel-card stat-card admin"><div class="small text-muted">Total Therapists</div><div class="stat-value">${therapistsTotal}</div><div class="small text-muted mt-1">${therapistsActive} active</div></div></div>
+                        <div class="col-6 col-lg-4"><div class="panel-card stat-card admin"><div class="small text-muted">Total Bookings</div><div class="stat-value">${bookingsTotal}</div></div></div>
+                        <div class="col-12 col-lg-4"><div class="panel-card stat-card admin"><div class="small text-muted">Collected Revenue</div><div class="stat-value">${money(collectedAmount)}</div><div class="small text-muted mt-1">Pending ${money(pendingAmount)}</div></div></div>
                     </section>
 
                     <section class="row g-3 mb-3 admin-overview-grid">
@@ -1590,7 +1716,7 @@ async function adminPanelTemplate() {
                     <section class="hero-card">
                         <h3 class="section-title">Bookings</h3>
                         <div class="d-grid gap-2 d-lg-none">
-                            ${bookings.map((b) => `<div class="panel-card admin-mobile-card">
+                            ${bookings.map((b) => `<div class="panel-card admin-mobile-card ${isCancelledBooking(b.booking_status) ? 'is-cancelled-text' : ''}">
                                 <div class="d-flex justify-content-between align-items-start gap-2">
                                     <div class="fw-semibold">${b.booking_code}</div>
                                     ${bookingStatusBadge(b.booking_status)}
@@ -1598,8 +1724,11 @@ async function adminPanelTemplate() {
                                 <div class="small text-muted mt-1">${b.booking_date} ${b.booking_time}</div>
                                 <div class="small mt-2"><strong>${b.customer_name || '-'}</strong> · ${b.customer_phone || '-'}</div>
                                 <div class="small text-muted mt-1">${b.therapist_name || '-'}</div>
-                                <div class="small mt-2">${money(b.total_amount)} · ${bookingStatusBadge(b.payment_status)}</div>
-                                <div class="mt-3 d-flex justify-content-end">
+                                <div class="small mt-2">${money(b.total_amount)} · ${paymentStatusBadge(b.payment_status, b.booking_status)}</div>
+                                <div class="mt-3 d-flex justify-content-end gap-2">
+                                    ${(b.payment_method === 'credit_card' && b.payment_status !== 'paid' && !isCancelledBooking(b.booking_status))
+                                        ? `<button class="btn btn-outline-primary btn-sm js-sync-stripe-inline" data-booking-id="${b.id}">Sync Stripe</button>`
+                                        : ''}
                                     <button class="btn btn-outline-secondary btn-sm js-view-booking" data-booking='${JSON.stringify(b).replace(/'/g,"&#39;")}'>View</button>
                                 </div>
                             </div>`).join('') || '<div class="panel-card text-muted small">No bookings found.</div>'}
@@ -1608,16 +1737,21 @@ async function adminPanelTemplate() {
                             <table class="table table-sm align-middle mb-0">
                                 <thead><tr><th>Code</th><th>Date</th><th>Customer</th><th>Services</th><th>Therapist</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr></thead>
                                 <tbody>
-                                    ${bookings.map((b) => `<tr>
+                                    ${bookings.map((b) => `<tr class="${isCancelledBooking(b.booking_status) ? 'is-cancelled-row' : ''}">
                                         <td><span class="fw-semibold">${b.booking_code}</span></td>
                                         <td>${b.booking_date}<div class="small text-muted">${b.booking_time}</div></td>
                                         <td><strong>${b.customer_name || '-'}</strong><div class="small text-muted">${b.customer_phone || '-'}</div></td>
                                         <td class="small" style="white-space:pre-line;max-width:160px">${b.order_details || '-'}</td>
                                         <td>${b.therapist_name}</td>
                                         <td>${money(b.total_amount)}</td>
-                                        <td>${bookingStatusBadge(b.payment_status)}</td>
+                                        <td>${paymentStatusBadge(b.payment_status, b.booking_status)}</td>
                                         <td>${bookingStatusBadge(b.booking_status)}</td>
-                                        <td><button class="btn btn-outline-secondary btn-sm js-view-booking" data-booking='${JSON.stringify(b).replace(/'/g,"&#39;")}'>View</button></td>
+                                        <td class="d-flex gap-2">
+                                            ${(b.payment_method === 'credit_card' && b.payment_status !== 'paid' && !isCancelledBooking(b.booking_status))
+                                                ? `<button class="btn btn-outline-primary btn-sm js-sync-stripe-inline" data-booking-id="${b.id}">Sync</button>`
+                                                : ''}
+                                            <button class="btn btn-outline-secondary btn-sm js-view-booking" data-booking='${JSON.stringify(b).replace(/'/g,"&#39;")}'>View</button>
+                                        </td>
                                     </tr>`).join('') || '<tr><td colspan="9">No bookings found.</td></tr>'}
                                 </tbody>
                             </table>
@@ -1631,17 +1765,18 @@ async function adminPanelTemplate() {
                         <div class="d-grid gap-2 d-lg-none">
                             ${payments.map((p) => {
                                 const isBank = p.provider === 'bank_transfer';
+                                const isCancelled = isCancelledBooking(p.booking_status);
                                 const paid = p.status === 'succeeded';
-                                const actionBtn = isBank
+                                const actionBtn = (isBank && !isCancelled)
                                     ? (paid
                                         ? `<button class="btn btn-outline-warning btn-sm js-payment-status" data-payment-id="${p.id}" data-target-status="pending">Mark Unpaid</button>`
                                         : `<button class="btn btn-success btn-sm js-payment-status" data-payment-id="${p.id}" data-target-status="paid">Mark Paid</button>`)
                                     : '<span class="text-muted small">Auto</span>';
 
-                                return `<div class="panel-card admin-mobile-card">
+                                return `<div class="panel-card admin-mobile-card ${isCancelled ? 'is-cancelled-text' : ''}">
                                     <div class="d-flex justify-content-between align-items-start gap-2">
                                         <div class="fw-semibold">${p.booking_code}</div>
-                                        ${bookingStatusBadge(p.status)}
+                                        ${paymentStatusBadge(p.status, p.booking_status)}
                                     </div>
                                     <div class="small mt-2"><strong>${p.customer_name || '-'}</strong> · ${p.customer_phone || '-'}</div>
                                     <div class="small text-muted mt-1">${p.provider} · ${p.created_at}</div>
@@ -1656,13 +1791,14 @@ async function adminPanelTemplate() {
                                 <tbody>
                                     ${payments.map((p) => {
                                         const isBank = p.provider === 'bank_transfer';
+                                        const isCancelled = isCancelledBooking(p.booking_status);
                                         const paid = p.status === 'succeeded';
-                                        const actionBtn = isBank
+                                        const actionBtn = (isBank && !isCancelled)
                                             ? (paid
                                                 ? `<button class="btn btn-outline-warning btn-sm js-payment-status" data-payment-id="${p.id}" data-target-status="pending">Mark Unpaid</button>`
                                                 : `<button class="btn btn-success btn-sm js-payment-status" data-payment-id="${p.id}" data-target-status="paid">Mark Paid</button>`)
                                             : '<span class="text-muted small">Auto</span>';
-                                        return `<tr><td>${p.booking_code}</td><td><strong>${p.customer_name || '-'}</strong><div class="small text-muted">${p.customer_phone || '-'}</div></td><td>${p.provider}</td><td>${money(p.amount)}</td><td>${bookingStatusBadge(p.status)}</td><td>${p.created_at}</td><td>${actionBtn}</td></tr>`;
+                                        return `<tr class="${isCancelled ? 'is-cancelled-row' : ''}"><td>${p.booking_code}</td><td><strong>${p.customer_name || '-'}</strong><div class="small text-muted">${p.customer_phone || '-'}</div></td><td>${p.provider}</td><td>${money(p.amount)}</td><td>${paymentStatusBadge(p.status, p.booking_status)}</td><td>${p.created_at}</td><td>${actionBtn}</td></tr>`;
                                     }).join('') || '<tr><td colspan="7">No payments found.</td></tr>'}
                                 </tbody>
                             </table>
@@ -1710,57 +1846,71 @@ async function adminPanelTemplate() {
                             </div>
                             <span class="pill">${Number(auditPagination.total || auditLogs.length)} events</span>
                         </div>
-                        <div class="d-grid gap-2 admin-audit-feed">
-                            ${auditLogs.map((log) => {
-                                const actor = log.admin_name || log.admin_email || `Admin #${log.admin_id || '-'}`;
-                                const actionLabel = String(log.action || '').replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                const targetType = (log.target_type || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                const targetId = Number(log.target_id || 0);
-                                const bookingCode = String(log.target_booking_code || log.details?.booking_code || '').trim();
-                                const targetText = (log.target_type === 'booking' && bookingCode)
-                                    ? `Booking ${bookingCode}`
-                                    : (targetId > 0 ? `${targetType} #${targetId}` : targetType || 'System');
+                        ${auditLogs.length === 0
+                            ? '<div class="panel-card text-center text-muted small">No audit logs available yet.</div>'
+                            : `<div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0 admin-audit-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-muted fw-semibold small">Action</th>
+                                            <th class="text-muted fw-semibold small">Target</th>
+                                            <th class="text-muted fw-semibold small">Actor</th>
+                                            <th class="text-muted fw-semibold small">When</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${auditLogs.map((log, idx) => {
+                                            const actor = log.admin_name || log.admin_email || `Admin #${log.admin_id || '-'}`;
+                                            const actionLabel = String(log.action || '').replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                            const targetType = (log.target_type || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                            const targetId = Number(log.target_id || 0);
+                                            const bookingCode = String(log.target_booking_code || log.details?.booking_code || '').trim();
+                                            const targetText = (log.target_type === 'booking' && bookingCode)
+                                                ? `Booking ${bookingCode}`
+                                                : (targetId > 0 ? `${targetType} #${targetId}` : targetType || 'System');
 
-                                const createdDate = new Date(log.created_at + 'Z');
-                                const timeStr = isNaN(createdDate.getTime()) ? log.created_at : createdDate.toLocaleString('en-US', { 
-                                    month: 'short', 
-                                    day: 'numeric', 
-                                    hour: '2-digit', 
-                                    minute: '2-digit',
-                                    second: '2-digit'
-                                });
+                                            const createdDate = new Date(log.created_at + 'Z');
+                                            const timeStr = isNaN(createdDate.getTime()) ? log.created_at : createdDate.toLocaleString('en-US', {
+                                                month: 'short', day: 'numeric',
+                                                hour: '2-digit', minute: '2-digit'
+                                            });
 
-                                const details = log.details || {};
-                                const detailsExcluded = ['source_ip', 'user_agent'];
-                                const detailEntries = Object.entries(details)
-                                    .filter(([key]) => !detailsExcluded.includes(key))
-                                    .map(([key, value]) => {
-                                        const displayKey = key.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                        const displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
-                                        return `<div class="small"><span class="text-muted">${displayKey}:</span> <strong>${displayVal}</strong></div>`;
-                                    });
+                                            const actionColor = log.action.includes('cancel') ? 'bg-danger-subtle text-danger-emphasis'
+                                                               : log.action.includes('created') ? 'bg-success-subtle text-success-emphasis'
+                                                               : log.action.includes('updated') ? 'bg-info-subtle text-info-emphasis'
+                                                               : 'bg-light text-dark';
 
-                                const sourceIp = details.source_ip || '-';
-                                const actionColor = log.action.includes('cancel') ? 'bg-danger-subtle text-danger-emphasis' 
-                                                   : log.action.includes('created') ? 'bg-success-subtle text-success-emphasis'
-                                                   : log.action.includes('updated') ? 'bg-info-subtle text-info-emphasis'
-                                                   : 'bg-light text-dark';
-
-                                return `<div class="panel-card feed-row" style="border-left:4px solid var(--sage)">
-                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                                        <div>
-                                            <div class="fw-semibold">${actionLabel}</div>
-                                            <div class="small text-muted">${actor} · ${timeStr}</div>
-                                        </div>
-                                        <span class="badge ${actionColor}">${targetText}</span>
-                                    </div>
-                                    ${detailEntries.length > 0 ? '<div class="mt-2">' + detailEntries.join('') + '</div>' : ''}
-                                    <div class="small text-muted mt-2">IP: ${sourceIp}</div>
-                                </div>`;
-                            }).join('') || '<div class="panel-card text-center text-muted small">No audit logs available yet.</div>'}
-                        </div>
+                                            return `<tr>
+                                                <td><span class="badge ${actionColor}">${actionLabel}</span></td>
+                                                <td class="small">${targetText}</td>
+                                                <td class="small text-muted">${actor}</td>
+                                                <td class="small text-muted text-nowrap">${timeStr}</td>
+                                                <td><button class="btn btn-sm btn-outline-secondary py-0 px-2 audit-view-btn" data-audit-idx="${idx}">View</button></td>
+                                            </tr>`;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>`
+                        }
                         <div class="small text-muted mt-3">Page ${Number(auditPagination.page || 1)} of ${Number(auditPagination.total_pages || 1)}</div>
                     </section>
+
+                    <!-- Audit detail modal -->
+                    <div class="modal fade" id="auditDetailModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Audit Detail</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body" id="auditDetailBody"></div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section id="admin-files" class="panel-section">
@@ -1855,6 +2005,26 @@ async function adminPanelTemplate() {
                         <form id="adminSettingsForm" class="d-grid gap-3 settings-compact-form">
                             <div class="accordion" id="siteSettingsAccordion">
                                 <div class="accordion-item">
+                                                                    <div class="accordion-item">
+                                                                        <h2 class="accordion-header" id="setHeadOpenHours">
+                                                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#setOpenHours" aria-expanded="false" aria-controls="setOpenHours">Open Hours</button>
+                                                                        </h2>
+                                                                        <div id="setOpenHours" class="accordion-collapse collapse" aria-labelledby="setHeadOpenHours" data-bs-parent="#siteSettingsAccordion">
+                                                                            <div class="accordion-body">
+                                                                                <div class="row g-3">
+                                                                                    <div class="col-md-6">
+                                                                                        <label class="form-label small fw-semibold">Open Hour Start</label>
+                                                                                        <input class="form-control" type="time" name="open_hours_start" value="${siteSettings.open_hours_start || '09:00'}">
+                                                                                    </div>
+                                                                                    <div class="col-md-6">
+                                                                                        <label class="form-label small fw-semibold">Open Hour End</label>
+                                                                                        <input class="form-control" type="time" name="open_hours_end" value="${siteSettings.open_hours_end || '21:00'}">
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div class="form-text">Set the daily opening and closing hours for bookings (24h format).</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                     <h2 class="accordion-header" id="setHeadBrand">
                                         <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#setBrand" aria-expanded="true" aria-controls="setBrand">Brand & Logo</button>
                                     </h2>
@@ -2164,6 +2334,144 @@ function showBookingConfirmModal(bookingCode, totalAmount, paymentMethod) {
     modal.show();
 }
 
+async function showStripeCardModal({ clientSecret, publishableKey, bookingCode, totalAmount, customerName, customerPhone }) {
+    if (!clientSecret) {
+        throw new Error('Stripe client secret is missing.');
+    }
+
+    const pk = String(publishableKey || window.APP_BOOTSTRAP?.stripePublishableKey || '').trim();
+    if (!pk) {
+        throw new Error('Stripe publishable key is not configured.');
+    }
+
+    if (typeof window.Stripe !== 'function') {
+        throw new Error('Stripe.js failed to load.');
+    }
+
+    if (!document.getElementById('stripeCardModal')) {
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div class="modal fade" id="stripeCardModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Pay with Card</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="small text-muted mb-2" id="stripeCardBookingCode"></div>
+                            <div class="fw-semibold mb-3" id="stripeCardAmount"></div>
+                            <label class="form-label">Card Details</label>
+                            <div id="stripeCardElement" class="form-control" style="padding-top: 12px; padding-bottom: 12px;"></div>
+                            <div id="stripeCardError" class="text-danger small mt-2" role="alert"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-luxury" id="stripeCardPayBtn">Pay Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(el.firstElementChild);
+    }
+
+    const modalEl = document.getElementById('stripeCardModal');
+    const codeEl = document.getElementById('stripeCardBookingCode');
+    const amountEl = document.getElementById('stripeCardAmount');
+    const errorEl = document.getElementById('stripeCardError');
+    const payBtn = document.getElementById('stripeCardPayBtn');
+    const cardHost = document.getElementById('stripeCardElement');
+
+    codeEl.textContent = bookingCode ? `Booking: ${bookingCode}` : '';
+    amountEl.textContent = totalAmount ? money(totalAmount) : '';
+    errorEl.textContent = '';
+    payBtn.disabled = false;
+    payBtn.textContent = 'Pay Now';
+
+    // Clear previous card element if it exists
+    cardHost.innerHTML = '';
+
+    const stripe = window.Stripe(pk);
+    const elements = stripe.elements();
+    const card = elements.create('card', { hidePostalCode: true });
+    card.mount(cardHost);
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    return await new Promise((resolve, reject) => {
+        let settled = false;
+
+        const cleanup = () => {
+            if (typeof payBtn.onclick === 'function') {
+                payBtn.onclick = null;
+            }
+            modalEl.removeEventListener('hidden.bs.modal', onHidden);
+            try { card.unmount(); } catch {}
+        };
+
+        const onHidden = () => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                reject(new Error('Payment cancelled.'));
+            }
+        };
+
+        modalEl.addEventListener('hidden.bs.modal', onHidden);
+
+        payBtn.onclick = async () => {
+            payBtn.disabled = true;
+            payBtn.textContent = 'Processing...';
+            errorEl.textContent = '';
+
+            try {
+                const paymentPromise = stripe.confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card,
+                        billing_details: {
+                            name: String(customerName || '').trim(),
+                            phone: String(customerPhone || '').trim(),
+                        },
+                    },
+                });
+
+                // Add timeout of 30 seconds
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Payment processing timeout. Please check your network and try again.')), 30000)
+                );
+
+                const { error, paymentIntent } = await Promise.race([paymentPromise, timeoutPromise]);
+
+                if (error) {
+                    errorEl.textContent = error.message || 'Payment failed. Please try another card.';
+                    payBtn.disabled = false;
+                    payBtn.textContent = 'Pay Now';
+                    return;
+                }
+
+                const okStatuses = ['succeeded', 'processing', 'requires_capture'];
+                if (!paymentIntent || !okStatuses.includes(paymentIntent.status)) {
+                    errorEl.textContent = 'Payment status is not completed yet. Please try again.';
+                    payBtn.disabled = false;
+                    payBtn.textContent = 'Pay Now';
+                    return;
+                }
+
+                settled = true;
+                cleanup();
+                modal.hide();
+                resolve(paymentIntent);
+            } catch (err) {
+                errorEl.textContent = err.message || 'Payment failed. Please try again.';
+                payBtn.disabled = false;
+                payBtn.textContent = 'Pay Now';
+            }
+        };
+
+        modal.show();
+    });
+}
+
 function attachBookingHandlers() {
     const bookingForm = document.getElementById('bookingForm');
     const result = document.getElementById('bookingResult');
@@ -2186,17 +2494,28 @@ function attachBookingHandlers() {
 
     // ── Helpers ────────────────────────────────────────────────────────
     function goToStep(n) {
-        document.querySelectorAll('.booking-panel').forEach((p) => p.classList.remove('active'));
+        // Hide all step panels and show only the one for step n
+        document.querySelectorAll('.booking-step-panel').forEach((p) => p.classList.remove('active'));
         const panel = document.getElementById(`bookStep${n}`);
-        if (panel) { panel.classList.add('active'); panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-        document.querySelectorAll('#bookingStepBar .booking-step').forEach((s) => {
-            const sn = parseInt(s.dataset.step, 10);
-            s.classList.toggle('active', sn === n);
-            s.classList.toggle('done', sn < n);
+        if (panel) {
+            panel.classList.add('active');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        // Update progress pills
+        document.querySelectorAll('#bookingStepBar .progress-pill').forEach((pill) => {
+            const pillStep = parseInt(pill.dataset.step, 10);
+            pill.classList.toggle('active', pillStep === n);
+            pill.classList.toggle('completed', pillStep < n);
         });
-        document.querySelectorAll('#bookingStepBar .step-line').forEach((line, i) => {
-            line.classList.toggle('done', i < n - 1);
-        });
+        
+        // Update progress bar fill
+        const progressFill = document.querySelector('.booking-progress-bar .progress-fill');
+        if (progressFill) {
+            const percentage = (n / 4) * 100;
+            progressFill.style.width = percentage + '%';
+        }
+        
         if (n === 4) updateSummary();
     }
 
@@ -2248,16 +2567,13 @@ function attachBookingHandlers() {
     // ── Step navigation ────────────────────────────────────────────────
     function buildTherapistCard(t) {
         return `
-            <label class="therapist-pick-card">
+            <label class="therapist-option">
                 <input type="radio" name="therapist_pick" value="${t.id}" class="d-none therapist-radio" data-name="${t.name}">
-                <div class="therapist-pick-inner">
-                    <img src="${therapistPhotoUrl(t.photo_url, '72x72')}" alt="${t.name}" class="therapist-pick-img" onerror="this.onerror=null;this.src='${avatarFallbackUrl('72x72')}'">
-                    <div class="therapist-pick-info">
-                        <div class="fw-bold">${t.name}</div>
-                        <div class="small text-muted">${t.specialty || 'General Therapy'}</div>
-                        <div class="small mt-1">${Number(t.experience_years || 0)} yrs · ⭐ ${Number(t.rating || 5).toFixed(1)}</div>
-                    </div>
-                    <div class="pick-check-icon">✓</div>
+                <div class="therapist-card-modern">
+                    <img src="${therapistPhotoUrl(t.photo_url, '80x80')}" alt="${t.name}" onerror="this.onerror=null;this.src='${avatarFallbackUrl('80x80')}'">
+                    <h5>${t.name}</h5>
+                    <span class="therapist-role">${t.specialty || 'General Therapy'}</span>
+                    <div style="font-size:0.7rem;color:rgba(36,67,58,0.6);">${Number(t.experience_years || 0)} yrs · ⭐ ${Number(t.rating || 5).toFixed(1)}</div>
                 </div>
             </label>`;
     }
@@ -2275,33 +2591,25 @@ function attachBookingHandlers() {
         if (time) params.set('time', time);
         if ([...params].length) url += '?' + params.toString();
 
-        grid.innerHTML = '<p class="text-muted small">Loading therapists…</p>';
+        grid.innerHTML = '<p class="text-muted">Loading therapists…</p>';
         try {
             const res = await apiFetch(url).catch(() => ({}));
             let list = res?.data?.therapists || [];
 
-            // Fallback: if selected filters return empty, show all therapists so step 3 never feels broken.
             if (!list.length) {
-                const fallbackRes = await apiFetch('api/therapists').catch(() => ({}));
-                list = fallbackRes?.data?.therapists || [];
-            }
-
-            if (!list.length) {
-                grid.innerHTML = '<p class="text-muted small">No therapists available for the selected area. Try a different area or date.</p>';
+                grid.innerHTML = '<p class="text-muted">No therapists available for the selected area. Try a different area or date.</p>';
                 return;
             }
             grid.innerHTML = list.map(buildTherapistCard).join('');
             // Re-attach pick handlers for dynamically rendered cards
-            grid.querySelectorAll('.therapist-pick-card').forEach((card) => {
-                card.addEventListener('click', () => {
-                    grid.querySelectorAll('.therapist-pick-card').forEach((c) => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    const radio = card.querySelector('input[type="radio"]');
+            grid.querySelectorAll('.therapist-option').forEach((option) => {
+                option.addEventListener('click', () => {
+                    const radio = option.querySelector('input[type="radio"]');
                     if (radio) radio.checked = true;
                 });
             });
         } catch {
-            grid.innerHTML = '<p class="text-danger small">Failed to load therapists. Please try again.</p>';
+            grid.innerHTML = '<p class="text-danger">Failed to load therapists. Please try again.</p>';
         }
     }
 
@@ -2337,25 +2645,67 @@ function attachBookingHandlers() {
         btn.addEventListener('click', () => goToStep(parseInt(btn.dataset.prev, 10)));
     });
 
+    function clearTherapistSelection() {
+        const therapistIdInput = document.getElementById('bookingTherapistId');
+        if (therapistIdInput) therapistIdInput.value = '';
+
+        bookingForm.querySelectorAll('.therapist-radio').forEach((radio) => {
+            radio.checked = false;
+        });
+
+        bookingForm.querySelectorAll('.therapist-option').forEach((el) => {
+            el.classList.remove('selected');
+        });
+    }
+
     // ── Service card toggle ────────────────────────────────────────────
-    document.querySelectorAll('.service-card').forEach((card) => {
-        card.addEventListener('click', () => {
-            const cb = card.querySelector('input[type="checkbox"]');
+    document.querySelectorAll('.service-option').forEach((option) => {
+        option.addEventListener('click', () => {
+            const cb = option.querySelector('input[type="checkbox"]');
             if (!cb) return;
             cb.checked = !cb.checked;
-            card.classList.toggle('selected', cb.checked);
-            const count = bookingForm.querySelectorAll('.service-check:checked').length;
-            const countEl = document.getElementById('serviceCount');
-            if (countEl) countEl.textContent = `${count} selected`;
+            option.classList.toggle('selected', cb.checked);
+        });
+    });
+
+    const serviceDetailModalEl = document.getElementById('serviceDetailModal');
+    const serviceDetailTitleEl = document.getElementById('serviceDetailTitle');
+    const serviceDetailMetaEl = document.getElementById('serviceDetailMeta');
+    const serviceDetailTextEl = document.getElementById('serviceDetailText');
+    const serviceDetailModal = serviceDetailModalEl ? new bootstrap.Modal(serviceDetailModalEl) : null;
+
+    bookingForm.querySelectorAll('.service-info-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!serviceDetailModal || !serviceDetailTitleEl || !serviceDetailTextEl || !serviceDetailMetaEl) return;
+
+            const name = btn.dataset.serviceName || 'Treatment';
+            const detail = btn.dataset.serviceDetail || 'Treatment details are not available.';
+            const duration = Number(btn.dataset.serviceDuration || 0);
+            const price = Number(btn.dataset.servicePrice || 0);
+
+            serviceDetailTitleEl.textContent = name;
+            serviceDetailTextEl.textContent = detail;
+            serviceDetailMetaEl.textContent = `${duration > 0 ? `${duration} min` : ''}${duration > 0 && price > 0 ? ' • ' : ''}${price > 0 ? money(price) : ''}`;
+            serviceDetailModal.show();
         });
     });
 
     // ── Area card toggle ───────────────────────────────────────────────
-    document.querySelectorAll('.area-card').forEach((card) => {
-        card.addEventListener('click', () => {
-            bookingForm.querySelectorAll('.area-card').forEach((c) => c.classList.remove('selected'));
-            card.classList.add('selected');
+    document.querySelectorAll('.area-option').forEach((option) => {
+        option.addEventListener('click', () => {
+            const radio = option.querySelector('input[type="radio"]');
+            if (!radio) return;
+            const wasChecked = radio.checked;
+            radio.checked = true;
+            if (!wasChecked) clearTherapistSelection();
         });
+    });
+
+    bookingForm.querySelectorAll('[name="booking_date"], [name="booking_time"]').forEach((input) => {
+        input.addEventListener('change', () => clearTherapistSelection());
     });
 
     bookingForm.querySelectorAll('[name="payment_method"]').forEach((radio) => {
@@ -2368,15 +2718,12 @@ function attachBookingHandlers() {
         const therapistIdInput = document.getElementById('bookingTherapistId');
         if (therapistIdInput) therapistIdInput.value = '';
 
-        bookingForm.querySelectorAll('.area-card, .service-card, .therapist-pick-card').forEach((el) => {
+        bookingForm.querySelectorAll('.area-option, .service-option, .therapist-option').forEach((el) => {
             el.classList.remove('selected');
         });
 
-        const countEl = document.getElementById('serviceCount');
-        if (countEl) countEl.textContent = '0 selected';
-
         const grid = document.getElementById('therapistPickGrid');
-        if (grid) grid.innerHTML = '<p class="text-muted small">Loading therapists…</p>';
+        if (grid) grid.innerHTML = '<p class="text-muted">Loading therapists…</p>';
 
         syncPaymentMethodUI();
         updateSummary();
@@ -2423,6 +2770,9 @@ function attachBookingHandlers() {
             } catch { /* ignore, proceed with existing token */ }
 
             const bookingRes = await apiFetch('api/bookings', { method: 'POST', body: JSON.stringify(payload) });
+
+            let paymentCompleted = false;
+
             if (paymentMethod === 'credit_card') {
                 if (!isCreditCardEnabled()) {
                     result.innerHTML = `
@@ -2445,10 +2795,20 @@ function attachBookingHandlers() {
                     }),
                 });
 
+                await showStripeCardModal({
+                    clientSecret: paymentRes.data?.client_secret,
+                    publishableKey: paymentRes.data?.publishable_key,
+                    bookingCode: bookingRes.data.booking_code,
+                    totalAmount: bookingRes.data.total_amount,
+                    customerName: payload.customer_name,
+                    customerPhone: payload.customer_phone,
+                });
+                paymentCompleted = true;
+
                 result.innerHTML = `
                     <div class="alert alert-success">
                         <strong>Booking ${bookingRes.data.booking_code} confirmed!</strong><br>
-                        Credit Card selected. Stripe payment intent is ready${paymentRes.data.client_secret ? '.' : ', but no client secret was returned.'}
+                        Card payment completed successfully.
                     </div>
                 `;
             } else {
@@ -2462,7 +2822,7 @@ function attachBookingHandlers() {
             }
 
             // Show booking confirmation modal
-            showBookingConfirmModal(bookingRes.data.booking_code, bookingRes.data.total_amount, paymentMethod);
+            showBookingConfirmModal(bookingRes.data.booking_code, bookingRes.data.total_amount, paymentMethod === 'credit_card' && paymentCompleted ? 'credit_card' : paymentMethod);
             clearBookingFormAndState();
         } catch (err) {
             result.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
@@ -2653,7 +3013,7 @@ function buildBookingDetailHtml(b) {
             </div>
             <div class="col-sm-4">
                 <div class="small text-muted">Payment</div>
-                <div>${bookingStatusBadge(b.payment_status)} <span class="small text-muted">${b.payment_method || ''}</span></div>
+                <div>${paymentStatusBadge(b.payment_status, b.booking_status)} <span class="small text-muted">${b.payment_method || ''}</span></div>
             </div>
             <div class="col-sm-4">
                 <div class="small text-muted">Status</div>
@@ -3146,6 +3506,10 @@ function attachAdminPanelHandlers() {
             e.preventDefault();
             const fd = new FormData(settingsForm);
             const payload = Object.fromEntries(fd.entries());
+            // Combine open_hours_start and open_hours_end into open_hours JSON
+            if (payload.open_hours_start && payload.open_hours_end) {
+                payload.open_hours = JSON.stringify({ start: payload.open_hours_start, end: payload.open_hours_end });
+            }
             try {
                 const res = await apiFetch('api/admin/settings', { method: 'POST', body: JSON.stringify(payload) });
                 settingsResult.innerHTML = '';
@@ -3302,10 +3666,45 @@ function attachAdminPanelHandlers() {
         });
     });
 
+    document.querySelectorAll('.js-sync-stripe-inline').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const bookingId = Number(btn.dataset.bookingId || 0);
+            if (!bookingId) return;
+
+            btn.disabled = true;
+            try {
+                const res = await apiFetch('api/admin/payments/sync-stripe', {
+                    method: 'POST',
+                    body: JSON.stringify({ booking_id: bookingId }),
+                });
+                showToast(res.message || 'Stripe payment synced.', 'success');
+                setTimeout(() => renderRoute(), 300);
+            } catch (err) {
+                showToast(getErrorMessage(err, 'Failed to sync Stripe payment.'), 'danger');
+                btn.disabled = false;
+            }
+        });
+    });
+
     // ── Coverage Area Assignment (group-based, auto-save) ──
         // ── Booking Detail Modal (admin) ──
+        const bookingDetailModalEl = document.getElementById('bookingDetailModal');
+        let bookingDetailLastTrigger = null;
+
+        bookingDetailModalEl?.addEventListener('hidden.bs.modal', () => {
+            const active = document.activeElement;
+            if (active && bookingDetailModalEl.contains(active) && typeof active.blur === 'function') {
+                active.blur();
+            }
+
+            if (bookingDetailLastTrigger && typeof bookingDetailLastTrigger.focus === 'function') {
+                bookingDetailLastTrigger.focus();
+            }
+        });
+
         document.querySelectorAll('.js-view-booking').forEach((btn) => {
             btn.addEventListener('click', () => {
+                bookingDetailLastTrigger = btn;
                 const raw = btn.getAttribute('data-booking') || '{}';
                 const b = JSON.parse(raw.replaceAll('&#39;', "'"));
                 const bodyEl = document.getElementById('bookingDetailBody');
@@ -3316,6 +3715,7 @@ function attachAdminPanelHandlers() {
 
                 const isCancelled = b.booking_status === 'cancelled';
                 const isBank = b.payment_method === 'bank_transfer';
+                const isCard = b.payment_method === 'credit_card';
                 const isPaid = b.payment_status === 'paid';
                 const paymentId = Number(b.payment_id || 0);
 
@@ -3328,6 +3728,9 @@ function attachAdminPanelHandlers() {
                             actions += `<button class="btn btn-success btn-sm js-modal-payment" data-payment-id="${paymentId}" data-target-status="paid">Mark Paid</button>`;
                         }
                     }
+                    if (isCard && !isPaid) {
+                        actions += `<button class="btn btn-outline-primary btn-sm js-modal-sync-stripe" data-booking-id="${b.id}">Sync Stripe</button>`;
+                    }
                     actions += `<button class="btn btn-outline-danger btn-sm js-modal-cancel" data-booking-id="${b.id}">Cancel Booking</button>`;
                 }
                 actions += `<button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>`;
@@ -3336,11 +3739,18 @@ function attachAdminPanelHandlers() {
                 // Wire action buttons
                 footerEl.querySelectorAll('.js-modal-payment').forEach((ab) => {
                     ab.addEventListener('click', async () => {
+                        const paymentId = Number(ab.dataset.paymentId || 0);
+                        const targetStatus = String(ab.dataset.targetStatus || '');
+                        if (!paymentId || !['paid', 'pending'].includes(targetStatus)) {
+                            showToast('Invalid payment action request.', 'danger');
+                            return;
+                        }
+
                         ab.disabled = true;
                         try {
                             const res = await apiFetch('api/admin/payments/confirm', {
                                 method: 'POST',
-                                body: JSON.stringify({ payment_id: Number(ab.dataset.paymentId), target_status: ab.dataset.targetStatus }),
+                                body: JSON.stringify({ payment_id: paymentId, target_status: targetStatus }),
                             });
                             showToast(res.message || 'Payment status updated.', 'success');
                             setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('bookingDetailModal'))?.hide(); renderRoute(); }, 800);
@@ -3352,12 +3762,17 @@ function attachAdminPanelHandlers() {
                 });
                 footerEl.querySelectorAll('.js-modal-cancel').forEach((ab) => {
                     ab.addEventListener('click', async () => {
+                        const bookingId = Number(ab.dataset.bookingId || 0);
+                        if (!bookingId) {
+                            showToast('Invalid booking ID.', 'danger');
+                            return;
+                        }
                         if (!confirm('Cancel this booking? If paid by bank transfer a manual refund is required.')) return;
                         ab.disabled = true;
                         try {
                             const res = await apiFetch('api/admin/bookings/cancel', {
                                 method: 'POST',
-                                body: JSON.stringify({ booking_id: Number(ab.dataset.bookingId) }),
+                                body: JSON.stringify({ booking_id: bookingId }),
                             });
                             showToast(res.message || 'Booking cancelled.', 'warning');
                             setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('bookingDetailModal'))?.hide(); renderRoute(); }, 800);
@@ -3367,8 +3782,32 @@ function attachAdminPanelHandlers() {
                         }
                     });
                 });
+                footerEl.querySelectorAll('.js-modal-sync-stripe').forEach((ab) => {
+                    ab.addEventListener('click', async () => {
+                        const bookingId = Number(ab.dataset.bookingId || 0);
+                        if (!bookingId) {
+                            showToast('Invalid booking ID.', 'danger');
+                            return;
+                        }
 
-                new bootstrap.Modal(document.getElementById('bookingDetailModal')).show();
+                        ab.disabled = true;
+                        try {
+                            const res = await apiFetch('api/admin/payments/sync-stripe', {
+                                method: 'POST',
+                                body: JSON.stringify({ booking_id: bookingId }),
+                            });
+                            showToast(res.message || 'Stripe payment synced.', 'success');
+                            setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('bookingDetailModal'))?.hide(); renderRoute(); }, 800);
+                        } catch (err) {
+                            showToast(getErrorMessage(err, 'Failed to sync Stripe payment.'), 'danger');
+                            ab.disabled = false;
+                        }
+                    });
+                });
+
+                if (bookingDetailModalEl) {
+                    bootstrap.Modal.getOrCreateInstance(bookingDetailModalEl).show();
+                }
             });
         });
 
@@ -3505,7 +3944,7 @@ function attachDashboardSidebarHandlers() {
             if (!isMobileSidebar()) {
                 sidebar.classList.remove('mobile-menu-open');
                 links.forEach((link) => {
-                    link.hidden = false;
+                    link.removeAttribute('hidden');
                     link.style.display = '';
                 });
                 if (mobileToggle) mobileToggle.setAttribute('aria-expanded', 'false');
@@ -3514,8 +3953,8 @@ function attachDashboardSidebarHandlers() {
 
             sidebar.classList.toggle('mobile-menu-open', open);
             links.forEach((link) => {
-                link.hidden = !open;
-                link.style.display = open ? 'flex' : 'none';
+                link.removeAttribute('hidden');
+                link.style.display = '';
             });
             if (mobileToggle) mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         };
@@ -3576,6 +4015,45 @@ function attachDashboardSidebarHandlers() {
 
         syncMobileToggleLabel();
     });
+
+    // Audit log "View" button → detail modal
+    document.querySelectorAll('.audit-view-btn').forEach((btn) => {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.auditIdx, 10);
+            const log = (window.__auditLogsCache || [])[idx];
+            if (!log) return;
+
+            const actor = log.admin_name || log.admin_email || `Admin #${log.admin_id || '-'}`;
+            const actionLabel = String(log.action || '').replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            const createdDate = new Date(log.created_at + 'Z');
+            const timeStr = isNaN(createdDate.getTime()) ? log.created_at : createdDate.toLocaleString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            const details = log.details || {};
+            const rows = Object.entries(details).map(([k, v]) => {
+                const label = k.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                const val = typeof v === 'object' ? `<pre class="mb-0 small">${JSON.stringify(v, null, 2)}</pre>` : `<span>${v}</span>`;
+                return `<tr><td class="text-muted small pe-3 text-nowrap">${label}</td><td class="small fw-semibold">${val}</td></tr>`;
+            }).join('');
+
+            const body = document.getElementById('auditDetailBody');
+            if (body) {
+                body.innerHTML = `
+                    <dl class="row g-1 mb-3">
+                        <dt class="col-4 text-muted small">Action</dt><dd class="col-8 small fw-semibold mb-0">${actionLabel}</dd>
+                        <dt class="col-4 text-muted small">Actor</dt><dd class="col-8 small mb-0">${actor}</dd>
+                        <dt class="col-4 text-muted small">When</dt><dd class="col-8 small mb-0">${timeStr}</dd>
+                    </dl>
+                    ${rows ? `<h6 class="small text-muted mb-2">Details</h6><table class="table table-sm table-borderless mb-0">${rows}</table>` : '<p class="text-muted small mb-0">No additional details.</p>'}
+                `;
+            }
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('auditDetailModal'));
+            modal.show();
+        });
+    });
 }
 
 async function renderRoute() {
@@ -3633,3 +4111,4 @@ window.addEventListener('hashchange', renderRoute);
     attachGlobalHandlers();
     renderRoute();
 })();
+

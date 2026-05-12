@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS service_categories (
     sort_order INT NOT NULL DEFAULT 0,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uq_service_categories_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS services (
@@ -155,7 +156,7 @@ CREATE TABLE IF NOT EXISTS payments (
     provider_payment_id VARCHAR(120) NOT NULL,
     amount DECIMAL(12,2) NOT NULL,
     currency VARCHAR(10) NOT NULL DEFAULT 'idr',
-    status ENUM('pending','succeeded','failed','refunded') NOT NULL DEFAULT 'pending',
+    status ENUM('pending','succeeded','failed','refunded','cancelled') NOT NULL DEFAULT 'pending',
     raw_payload LONGTEXT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
@@ -196,6 +197,7 @@ CREATE TABLE IF NOT EXISTS settings (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     setting_key VARCHAR(120) NOT NULL,
     setting_value LONGTEXT NULL,
+    created_at DATETIME NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uq_settings_key (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -257,8 +259,81 @@ FROM users u
 WHERE u.email = 'admin@grabmas.local'
   AND NOT EXISTS (SELECT 1 FROM admins a WHERE a.user_id = u.id);
 
+-- Seed demo therapist users
+INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
+SELECT 'Dewi Ayu', 'dewi@grabmas.local', '$2y$10$2f2djCspL.XXaMIUEjiJreqSEZWbOlMUqJPjA/eqJXmmPRb./ScaW', 'therapist', 'active', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'dewi@grabmas.local');
+
+INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
+SELECT 'Sari Wulandari', 'sari@grabmas.local', '$2y$10$2f2djCspL.XXaMIUEjiJreqSEZWbOlMUqJPjA/eqJXmmPRb./ScaW', 'therapist', 'active', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sari@grabmas.local');
+
+INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at)
+SELECT 'Ketut Ratna', 'ketut@grabmas.local', '$2y$10$2f2djCspL.XXaMIUEjiJreqSEZWbOlMUqJPjA/eqJXmmPRb./ScaW', 'therapist', 'active', NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'ketut@grabmas.local');
+
+-- Seed therapist profiles
+INSERT INTO therapists (user_id, bio, experience_years, rating, photo_url, is_active, created_at, updated_at)
+SELECT u.id,
+       'Certified Balinese spa therapist specialising in deep tissue and aromatherapy massage with over 6 years of luxury hotel experience.',
+       6, 4.9, NULL, 1, NOW(), NOW()
+FROM users u WHERE u.email = 'dewi@grabmas.local'
+  AND NOT EXISTS (SELECT 1 FROM therapists t WHERE t.user_id = u.id);
+
+INSERT INTO therapists (user_id, bio, experience_years, rating, photo_url, is_active, created_at, updated_at)
+SELECT u.id,
+       'Experienced in traditional Javanese and Balinese healing techniques. Specialises in prenatal massage and reflexology.',
+       4, 4.8, NULL, 1, NOW(), NOW()
+FROM users u WHERE u.email = 'sari@grabmas.local'
+  AND NOT EXISTS (SELECT 1 FROM therapists t WHERE t.user_id = u.id);
+
+INSERT INTO therapists (user_id, bio, experience_years, rating, photo_url, is_active, created_at, updated_at)
+SELECT u.id,
+       'Holistic wellness practitioner trained in Balinese boreh body scrub, hot stone therapy, and lomi lomi massage.',
+       5, 4.7, NULL, 1, NOW(), NOW()
+FROM users u WHERE u.email = 'ketut@grabmas.local'
+  AND NOT EXISTS (SELECT 1 FROM therapists t WHERE t.user_id = u.id);
+
+-- Seed therapist coverage areas (all areas for all demo therapists)
+INSERT INTO therapist_coverage_areas (therapist_id, area_id, created_at)
+SELECT t.id, ca.id, NOW()
+FROM therapists t
+JOIN users u ON u.id = t.user_id
+JOIN coverage_areas ca ON 1=1
+WHERE u.email IN ('dewi@grabmas.local','sari@grabmas.local','ketut@grabmas.local')
+  AND NOT EXISTS (
+      SELECT 1 FROM therapist_coverage_areas x
+      WHERE x.therapist_id = t.id AND x.area_id = ca.id
+  );
+
+-- Seed therapist services (all services for all demo therapists)
+INSERT INTO therapist_services (therapist_id, service_id, created_at)
+SELECT t.id, s.id, NOW()
+FROM therapists t
+JOIN users u ON u.id = t.user_id
+JOIN services s ON 1=1
+WHERE u.email IN ('dewi@grabmas.local','sari@grabmas.local','ketut@grabmas.local')
+  AND NOT EXISTS (
+      SELECT 1 FROM therapist_services x
+      WHERE x.therapist_id = t.id AND x.service_id = s.id
+  );
+
+-- Seed therapist schedules (Mon–Sun, 09:00–21:00)
+INSERT INTO therapist_schedules (therapist_id, day_of_week, start_time, end_time, is_available, created_at, updated_at)
+SELECT t.id, d.n, '09:00:00', '21:00:00', 1, NOW(), NOW()
+FROM therapists t
+JOIN users u ON u.id = t.user_id
+JOIN (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3
+      UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) d
+WHERE u.email IN ('dewi@grabmas.local','sari@grabmas.local','ketut@grabmas.local')
+  AND NOT EXISTS (
+      SELECT 1 FROM therapist_schedules x
+      WHERE x.therapist_id = t.id AND x.day_of_week = d.n
+  );
+
 INSERT INTO settings (setting_key, setting_value, updated_at) VALUES
 ('company_name', 'GrabMas Luxury Spa', NOW()),
 ('company_whatsapp', '+62XXXXXXXXXX', NOW()),
-('booking_notice', 'Please book at least 2 hours in advance.', NOW())
+('booking_notice', 'Please book at least 2 hours in advance.', NOW()),
+('open_hours', '{"start":"09:00","end":"21:00"}', NOW())
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at);

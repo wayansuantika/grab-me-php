@@ -1,4 +1,13 @@
-﻿:root {
+﻿/* Theme-matched badge for open hours on booking page */
+.booking-wizard .badge.open-hours {
+    background: var(--sage) !important;
+    color: var(--forest) !important;
+    font-weight: 700;
+    border-radius: 0.7em;
+    font-size: 0.98em;
+    box-shadow: 0 2px 8px rgba(36,67,58,0.07);
+}
+:root {
     --champagne: #f4efe6;
     --mist: #f9f7f2;
     --sage: #8dbbab;
@@ -11,6 +20,11 @@
     box-sizing: border-box;
 }
 
+html {
+    scrollbar-gutter: stable;
+    overflow-x: hidden;
+}
+
 body {
     font-family: 'Mulish', sans-serif;
     color: var(--ink);
@@ -19,6 +33,7 @@ body {
     display: flex;
     flex-direction: column;
     position: relative;
+    overflow-y: scroll;
     overflow-x: hidden;
 }
 
@@ -656,7 +671,7 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     }
 
     .dashboard-sidebar.mobile-menu-open .sidebar-link {
-        display: block;
+        display: flex;
     }
 }
 
@@ -724,7 +739,28 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 
 .booking-hero {
     text-align: center;
-    padding: 1rem 0 0.5rem;
+    padding: 1.5rem 1rem 2rem;
+    margin-bottom: 2rem;
+}
+
+.booking-hero .pill {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+}
+
+.booking-hero .section-title {
+    font-size: clamp(1.8rem, 5vw, 2.4rem);
+    margin: 0.8rem 0;
+    color: #1e4338;
+}
+
+.booking-hero p {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    max-width: 620px;
+    margin: 0 auto;
 }
 
 /* Step indicator bar */
@@ -746,36 +782,39 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 }
 
 .step-num {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    border: 2px solid rgba(36, 67, 58, 0.2);
+    border: 2px solid rgba(36, 67, 58, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: #8a9a96;
     background: #fff;
-    transition: all 0.25s ease;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 1px 3px rgba(36, 67, 58, 0.05);
 }
 
 .step-label {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     color: #8a9a96;
     white-space: nowrap;
-    transition: color 0.25s ease;
+    transition: color 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .step-line {
     flex: 1;
     height: 2px;
     background: rgba(36, 67, 58, 0.12);
-    margin: 0 0.4rem;
-    margin-bottom: 1.4rem;
-    transition: background 0.3s ease;
-    min-width: 24px;
+    margin: 0 0.3rem;
+    margin-bottom: 1.5rem;
+    transition: background 0.4s ease;
+    min-width: 20px;
 }
 
 .step-line.done {
@@ -786,10 +825,13 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     background: var(--forest);
     border-color: var(--forest);
     color: #fff;
+    box-shadow: 0 4px 12px rgba(40, 70, 56, 0.25);
+    transform: scale(1.05);
 }
 
 .booking-step.active .step-label {
     color: var(--forest);
+    font-weight: 800;
 }
 
 .booking-step.done .step-num {
@@ -817,9 +859,59 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 1.25rem;
-    margin-top: 1.25rem;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    padding-top: 1.5rem;
+    margin-top: 1.8rem;
+    border-top: 1px solid rgba(36, 67, 58, 0.1);
+    gap: 1rem;
+}
+
+.booking-panel .form-control,
+.booking-panel .form-select {
+    border: 1.5px solid rgba(36, 67, 58, 0.15);
+    border-radius: 0.8rem;
+    padding: 0.7rem 0.95rem;
+    font-size: 0.96rem;
+    transition: all 0.25s ease;
+    background-color: rgba(255, 255, 255, 0.97);
+    color: #2d3b35;
+}
+
+.booking-panel .form-control:focus,
+.booking-panel .form-select:focus {
+    border-color: var(--forest);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(40, 70, 56, 0.1);
+}
+
+.booking-panel .form-label {
+    font-weight: 750;
+    color: #1e4338;
+    margin-bottom: 0.65rem;
+    font-size: 0.92rem;
+}
+
+.booking-panel .btn-next-step,
+.booking-panel .btn-prev-step {
+    font-weight: 700;
+    border-radius: 0.8rem;
+    padding: 0.7rem 1.5rem;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.85rem;
+}
+
+.booking-panel .btn-luxury {
+    box-shadow: 0 4px 14px rgba(36, 67, 58, 0.2);
+}
+
+.booking-panel .btn-luxury:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(36, 67, 58, 0.25);
+}
+
+.booking-panel .btn-outline-secondary:hover {
+    transform: translateY(-2px);
 }
 
 /* Area cards */
@@ -838,28 +930,34 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.75rem 0.5rem;
-    border: 2px solid rgba(36, 67, 58, 0.1);
-    border-radius: 0.8rem;
-    background: rgba(255, 255, 255, 0.85);
-    font-size: 0.85rem;
-    font-weight: 600;
+    gap: 0.5rem;
+    padding: 1rem 0.75rem;
+    border: 2px solid rgba(36, 67, 58, 0.12);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.92);
+    font-size: 0.86rem;
+    font-weight: 700;
     color: #2d3b35;
     text-align: center;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 6px rgba(36, 67, 58, 0.06);
+    cursor: pointer;
 }
 
 .area-card-inner:hover {
     border-color: var(--sage);
-    background: rgba(141, 187, 171, 0.08);
+    background: rgba(141, 187, 171, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(141, 187, 171, 0.15);
 }
 
 .area-card.selected .area-card-inner,
 .area-card:has(input:checked) .area-card-inner {
     border-color: var(--forest);
-    background: rgba(141, 187, 171, 0.18);
+    background: rgba(40, 70, 56, 0.08);
     color: var(--forest);
+    box-shadow: 0 4px 14px rgba(40, 70, 56, 0.12);
+    font-weight: 800;
 }
 
 .area-icon {
@@ -890,44 +988,66 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 }
 
 .service-card-inner {
-    padding: 1rem 0.9rem;
-    border: 2px solid rgba(36, 67, 58, 0.1);
-    border-radius: 1rem;
-    background: rgba(255, 255, 255, 0.88);
-    transition: all 0.2s ease;
+    padding: 0;
+    border: 2px solid rgba(36, 67, 58, 0.12);
+    border-radius: 1.1rem;
+    background: rgba(255, 255, 255, 0.94);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     height: 100%;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(36, 67, 58, 0.05);
 }
 
 .service-card-img {
     display: block;
-    width: calc(100% + 1.8rem);
-    margin: -1rem -0.9rem 0.75rem;
-    height: 110px;
+    width: 100%;
+    height: 120px;
     object-fit: cover;
+    transition: transform 0.3s ease;
+    border-radius: 0.9rem 0.9rem 0 0;
+}
+
+.service-card-inner > * {
+    padding: 0 0.85rem;
+}
+
+.service-card-inner > :first-of-type:not(.service-card-img) {
+    padding-top: 0.85rem;
+}
+
+.service-card-inner > :last-child {
+    padding-bottom: 0.85rem;
 }
 
 .service-card-inner:hover {
     border-color: var(--sage);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(36, 67, 58, 0.08);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(141, 187, 171, 0.18);
+}
+
+.service-card-inner:hover .service-card-img {
+    transform: scale(1.08);
 }
 
 .service-card.selected .service-card-inner {
     border-color: var(--forest);
-    background: rgba(141, 187, 171, 0.14);
+    background: rgba(40, 70, 56, 0.08);
+    box-shadow: 0 6px 18px rgba(40, 70, 56, 0.14);
 }
 
 .addon-card .service-card-inner {
-    border-style: dashed;
-    border-color: rgba(209, 169, 108, 0.4);
-    background: rgba(252, 245, 235, 0.6);
+    border-style: solid;
+    border-color: rgba(209, 169, 108, 0.3);
+    background: rgba(252, 248, 242, 0.8);
 }
 
 .addon-card.selected .service-card-inner {
-    border-color: #c4913d;
-    background: rgba(209, 169, 108, 0.12);
+    border-color: #b8863a;
+    background: rgba(209, 169, 108, 0.15);
+    box-shadow: 0 6px 18px rgba(184, 134, 58, 0.12);
 }
 
 /* ── Service check mark (booking wizard) ── */
@@ -969,52 +1089,72 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
 }
 
 .therapist-pick-inner {
-    padding: 1.2rem 0.8rem;
-    border: 2px solid transparent;
-    border-radius: 1rem;
-    background: #fff;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-    transition: all 0.22s ease;
+    padding: 1.3rem 0.9rem;
+    border: 2px solid rgba(36, 67, 58, 0.1);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 2px 8px rgba(36, 67, 58, 0.06);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .therapist-pick-card:hover .therapist-pick-inner {
     border-color: var(--sage);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(141, 187, 171, 0.15);
 }
 
 .therapist-pick-card.selected .therapist-pick-inner {
     border-color: var(--forest);
-    background: rgba(141,187,171,0.12);
+    background: rgba(40, 70, 56, 0.08);
+    box-shadow: 0 6px 16px rgba(40, 70, 56, 0.12);
 }
 
 .therapist-pick-inner img {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     object-fit: cover;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.8rem;
+    border: 3px solid rgba(141, 187, 171, 0.3);
+    transition: border-color 0.3s ease;
+}
+
+.therapist-pick-card.selected .therapist-pick-inner img {
+    border-color: var(--forest);
 }
 
 .therapist-pick-inner .t-name {
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-size: 0.85rem;
+    font-weight: 800;
     color: var(--forest);
     display: block;
+    margin-bottom: 0.3rem;
 }
 
 .therapist-pick-inner .t-rating {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     color: #8a9990;
+    font-weight: 600;
 }
 
 /* ── Booking Summary ── */
 .booking-summary {
-    background: rgba(248,246,241,0.7);
-    border-radius: 1rem;
-    padding: 1.4rem;
-    border: 1px solid rgba(36,67,58,0.08);
+    background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(248,246,241,0.8) 100%);
+    border-radius: 1.3rem;
+    padding: 1.6rem;
+    border: 1px solid rgba(141, 187, 171, 0.15);
     position: sticky;
-    top: 90px;
+    top: 100px;
+    box-shadow: 0 4px 16px rgba(36, 67, 58, 0.08);
+}
+
+.booking-summary h5 {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--forest);
+    margin-bottom: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
 .summary-row {
@@ -2293,6 +2433,7 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     --sidebar-link-text: #33594c;
     --sidebar-border: #d7e7e0;
     font-family: 'Inter', 'Mulish', sans-serif;
+    overflow-y: scroll;
     background: radial-gradient(circle at 14% 4%, #fbfdfc 0%, #f3f8f5 38%, #edf4f1 100%);
 }
 
@@ -2782,6 +2923,281 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     --bs-table-bg: transparent;
 }
 
+/* Admin UX refresh: Shopify-like clean workspace pattern */
+.role-admin {
+    --workspace-bg: #f6f6f7;
+    --workspace-surface: #ffffff;
+    --workspace-border: #dcdcdc;
+    --workspace-text: #202223;
+    --workspace-muted: #6d7175;
+    --sidebar-accent: #8dbbab;
+    --sidebar-accent-soft: #eef4ff;
+    --sidebar-link-text: #2b2f33;
+    --sidebar-border: #d8dadd;
+    background: linear-gradient(180deg, #f6f6f7 0%, #f2f3f5 100%);
+}
+
+.role-admin .dashboard-shell {
+    width: min(100%, 1760px);
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 1rem;
+    padding-top: 0.85rem;
+    min-height: calc(100vh - 110px);
+}
+
+.role-admin .dashboard-sidebar {
+    width: 248px;
+    min-width: 248px;
+    max-width: 248px;
+    border-radius: 14px;
+    border: 1px solid var(--sidebar-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    background: #ffffff;
+    padding: 0.9rem 0.7rem;
+}
+
+.role-admin .sidebar-head {
+    border-bottom: 1px solid #eceef0;
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.8rem;
+}
+
+.role-admin .sidebar-head .pill {
+    background: #f1f2f3;
+    border-color: #e5e7ea;
+    color: #61666b;
+}
+
+.role-admin .sidebar-head h4 {
+    font-size: 0.95rem;
+    color: #111213;
+}
+
+.role-admin .sidebar-link {
+    border-radius: 9px;
+    border: 1px solid transparent;
+    background: #fff;
+    color: #2f3337;
+    font-weight: 600;
+    font-size: 0.86rem;
+    box-shadow: none;
+}
+
+.role-admin .sidebar-link::before {
+    width: 3px;
+    background: var(--sidebar-accent);
+}
+
+.role-admin .sidebar-link:hover {
+    background: #f4f6f8;
+    border-color: #e3e6ea;
+    color: #1f2328;
+    box-shadow: none;
+    transform: none;
+}
+
+.role-admin .sidebar-link.active {
+    background: var(--sidebar-accent-soft);
+    border-color: #cdddfb;
+    color: #8dbbab;
+    box-shadow: none;
+}
+
+.role-admin .dashboard-content.admin-workspace {
+    gap: 0.85rem;
+    min-height: calc(100vh - 130px);
+}
+
+.role-admin .admin-toolbar-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.8rem;
+    background: #ffffff;
+    border: 1px solid #dcdfe3;
+    border-radius: 12px;
+    padding: 0.8rem 1rem;
+}
+
+.role-admin .admin-toolbar-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1b1f23;
+}
+
+.role-admin .admin-toolbar-subtitle {
+    margin: 0.18rem 0 0;
+    font-size: 0.8rem;
+    color: #70757a;
+}
+
+.role-admin .admin-toolbar-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.role-admin .admin-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #d9dde2;
+    border-radius: 999px;
+    padding: 0.24rem 0.62rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: #4f5459;
+    background: #f7f8fa;
+}
+
+.role-admin .admin-meta-pill.is-ok {
+    color: #1f6f43;
+    background: #ebf8ef;
+    border-color: #b9e2c8;
+}
+
+.role-admin .admin-meta-pill.is-alert {
+    color: #8a5b00;
+    background: #fff6dd;
+    border-color: #eed48f;
+}
+
+.role-admin .admin-meta-pill.is-danger {
+    color: #8c2f3f;
+    background: #ffecef;
+    border-color: #f0b3be;
+}
+
+.badge-cancelled {
+    text-decoration: line-through;
+}
+
+.role-admin .is-cancelled-text,
+.role-therapist .is-cancelled-text {
+    color: #858b93;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+.role-admin .is-cancelled-text .badge,
+.role-admin .is-cancelled-text .btn,
+.role-therapist .is-cancelled-text .badge,
+.role-therapist .is-cancelled-text .btn {
+    text-decoration: none;
+}
+
+.role-admin tr.is-cancelled-row td:not(:last-child),
+.role-therapist tr.is-cancelled-row td:not(:last-child) {
+    color: #858b93;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+}
+
+.role-admin tr.is-cancelled-row td .badge,
+.role-admin tr.is-cancelled-row td .btn,
+.role-therapist tr.is-cancelled-row td .badge,
+.role-therapist tr.is-cancelled-row td .btn {
+    text-decoration: none;
+}
+
+.role-admin .hero-card,
+.role-admin .panel-card,
+.role-admin .table-responsive {
+    border-radius: 12px;
+    border: 1px solid #dbdee3;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    background: #fff;
+}
+
+.role-admin .hero-card {
+    padding: 1rem;
+}
+
+.role-admin .panel-card {
+    padding: 0.78rem;
+}
+
+.role-admin .section-title {
+    font-size: 1.04rem;
+    font-weight: 700;
+    color: #222529;
+}
+
+.role-admin .stat-card {
+    border: 1px solid #dfe3e8;
+    background: #fff;
+}
+
+.role-admin .stat-value {
+    font-size: clamp(1.35rem, 1.05rem + 0.7vw, 1.8rem);
+    color: #202223;
+}
+
+.role-admin .table-responsive {
+    overflow: auto;
+}
+
+.role-admin .table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f6f6f7;
+    border-bottom-color: #d9dce1;
+    color: #5c6167;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    padding-top: 0.78rem;
+    padding-bottom: 0.78rem;
+}
+
+.role-admin .table tbody tr:hover {
+    background: #f7f9fc;
+}
+
+.role-admin .table tbody td {
+    border-color: #eceff3;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+}
+
+.role-admin .btn {
+    border-radius: 9px;
+    font-weight: 600;
+}
+
+.role-admin .btn-luxury {
+    background: #111213;
+    border-color: #111213;
+    color: #fff;
+}
+
+.role-admin .btn-luxury:hover {
+    background: #1d1f21;
+    border-color: #1d1f21;
+    color: #fff;
+}
+
+.role-admin .btn-outline-secondary,
+.role-admin .btn-outline-dark {
+    border-color: #cfd4da;
+    color: #353a40;
+}
+
+.role-admin .btn-outline-secondary:hover,
+.role-admin .btn-outline-dark:hover {
+    background: #f1f3f5;
+    border-color: #bfc5cc;
+    color: #202327;
+}
+
+.role-admin .pill {
+    background: #f3f4f6;
+    border-color: #dfe2e6;
+    color: #5a6066;
+}
+
 @media (max-width: 991px) {
     .role-admin .dashboard-shell,
     .role-therapist .dashboard-shell {
@@ -2801,6 +3217,860 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     .role-therapist .sidebar-link {
         font-size: 0.84rem;
         padding: 0.44rem 0.64rem;
+    }
+
+    .role-admin .admin-toolbar-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .role-admin .dashboard-sidebar {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .role-admin .admin-toolbar-meta {
+        justify-content: flex-start;
+    }
+
+    /* Keep mobile sidebar behavior stable even with role-specific link styles below */
+    .role-admin .dashboard-sidebar .sidebar-mobile-toggle,
+    .role-therapist .dashboard-sidebar .sidebar-mobile-toggle {
+        display: flex !important;
+    }
+
+    .role-admin .dashboard-sidebar .sidebar-link,
+    .role-therapist .dashboard-sidebar .sidebar-link {
+        display: none;
+    }
+
+    .role-admin .dashboard-sidebar.mobile-menu-open .sidebar-link,
+    .role-therapist .dashboard-sidebar.mobile-menu-open .sidebar-link {
+        display: flex;
+    }
+}
+
+/* ── Booking Page Mobile Responsive ─────────────────────────────── */
+@media (max-width: 991px) {
+    .booking-summary {
+        top: auto;
+        margin-top: 2rem;
+        position: relative;
+    }
+    
+    .service-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+    
+    .therapist-pick-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .booking-hero {
+        padding: 1rem 0.75rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .booking-steps {
+        padding: 0 0.5rem;
+    }
+    
+    .booking-step {
+        gap: 0.2rem;
+    }
+    
+    .booking-step .step-num {
+        width: 36px;
+        height: 36px;
+        font-size: 0.8rem;
+    }
+    
+    .step-label {
+        font-size: 0.65rem;
+    }
+    
+    .step-line {
+        min-width: 16px;
+    }
+    
+    .hero-card {
+        padding: 1.5rem 1.2rem;
+    }
+    
+    .booking-panel .form-control,
+    .booking-panel .form-select {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .booking-panel .form-label {
+        font-size: 0.85rem;
+    }
+    
+    .service-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.6rem;
+    }
+    
+    .area-card-inner {
+        padding: 0.8rem 0.6rem;
+        font-size: 0.75rem;
+    }
+    
+    .area-icon {
+        font-size: 1.1rem;
+    }
+    
+    .therapist-pick-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.8rem;
+    }
+    
+    .therapist-pick-inner {
+        padding: 1rem 0.7rem;
+    }
+    
+    .therapist-pick-inner img {
+        width: 64px;
+        height: 64px;
+    }
+    
+    .step-footer {
+        flex-wrap: wrap;
+        padding-top: 1.2rem;
+        margin-top: 1.5rem;
+    }
+    
+    .step-footer .btn {
+        flex: 1;
+        min-width: 140px;
+    }
+    
+    .booking-panel .btn-next-step,
+    .booking-panel .btn-prev-step {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   BOOKING PAGE - MODERN MOBILE APP DESIGN (OVERRIDE)
+══════════════════════════════════════════════════════════════════════ */
+
+.booking-wizard {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Modern Progress Bar */
+.booking-progress-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: 4px;
+    background: rgba(36, 67, 58, 0.06);
+    overflow: hidden;
+}
+
+.booking-progress-bar .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--sage), var(--forest));
+    width: 25%;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Progress Pills */
+.booking-progress-pills {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 244, 0.95));
+    border-bottom: 1px solid rgba(36, 67, 58, 0.08);
+    gap: 0.5rem;
+    z-index: 49;
+    position: relative;
+}
+
+.progress-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    text-align: center;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.progress-pill.active {
+    opacity: 1;
+}
+
+.progress-pill.completed {
+    opacity: 0.7;
+}
+
+.pill-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(36, 67, 58, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--forest);
+    transition: all 0.3s ease;
+}
+
+.progress-pill.active .pill-number {
+    background: var(--forest);
+    color: white;
+    box-shadow: 0 4px 12px rgba(40, 70, 56, 0.3);
+    transform: scale(1.1);
+}
+
+.progress-pill.completed .pill-number {
+    background: var(--sage);
+    color: var(--forest);
+}
+
+.pill-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--forest);
+}
+
+/* Step Panels */
+.booking-step-panel {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 40;
+    overflow-y: auto;
+    padding-bottom: 2rem;
+}
+
+.booking-step-panel.active {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+    animation: fadeInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(240, 247, 244, 0.97));
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.step-content {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+.step-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.step-header h3 {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    font-weight: 800;
+    color: var(--forest);
+    margin-bottom: 0.5rem;
+}
+
+.step-header p {
+    font-size: 0.95rem;
+    color: rgba(36, 67, 58, 0.7);
+}
+
+/* Form Sections */
+.form-section {
+    margin-bottom: 2rem;
+}
+
+.form-section-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.form-section-row .flex-1 {
+    flex: 1;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--forest);
+    margin-bottom: 0.8rem;
+    text-transform: capitalize;
+}
+
+.form-control-modern {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border: 1.5px solid rgba(36, 67, 58, 0.15);
+    border-radius: 1rem;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--forest);
+    transition: all 0.3s ease;
+}
+
+.form-control-modern::placeholder {
+    color: rgba(36, 67, 58, 0.5);
+}
+
+.form-control-modern:focus {
+    border-color: var(--forest);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(40, 70, 56, 0.1);
+    outline: none;
+}
+
+/* Area Selector */
+.area-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1rem;
+}
+
+.area-option {
+    cursor: pointer;
+}
+
+.area-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 1.2rem 1rem;
+    border: 2px solid rgba(36, 67, 58, 0.12);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.95);
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--forest);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 8px rgba(36, 67, 58, 0.05);
+}
+
+.area-option input[type="radio"]:checked + .area-badge {
+    border-color: var(--forest);
+    background: linear-gradient(135deg, rgba(40, 70, 56, 0.1), rgba(141, 187, 171, 0.1));
+    box-shadow: 0 6px 20px rgba(40, 70, 56, 0.15);
+    transform: translateY(-2px);
+}
+
+.area-option:hover .area-badge {
+    border-color: var(--sage);
+    transform: translateY(-2px);
+}
+
+/* Service Grid - Modern */
+.service-grid-modern {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1.2rem;
+}
+
+.service-option {
+    cursor: pointer;
+}
+
+.service-card-modern {
+    display: flex;
+    flex-direction: column;
+    border: 2px solid rgba(36, 67, 58, 0.12);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.97);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 10px rgba(36, 67, 58, 0.06);
+    height: 100%;
+}
+
+.service-media {
+    position: relative;
+}
+
+.service-image {
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+    border-bottom: 1px solid rgba(36, 67, 58, 0.08);
+}
+
+.service-placeholder {
+    width: 100%;
+    height: 110px;
+    background: linear-gradient(135deg, rgba(141, 187, 171, 0.1), rgba(196, 145, 61, 0.1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    border-bottom: 1px solid rgba(36, 67, 58, 0.08);
+}
+
+.service-info-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(36, 67, 58, 0.25);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--forest);
+    font-size: 0.78rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(36, 67, 58, 0.15);
+    transition: all 0.2s ease;
+}
+
+.service-info-btn:hover,
+.service-info-btn:focus-visible {
+    background: var(--forest);
+    color: #fff;
+    border-color: var(--forest);
+    transform: translateY(-1px);
+}
+
+.service-detail-modal-content {
+    border-radius: 1rem;
+    border: 1px solid rgba(36, 67, 58, 0.12);
+}
+
+.service-detail-meta {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: rgba(36, 67, 58, 0.7);
+    margin-bottom: 0.6rem;
+}
+
+.service-detail-text {
+    font-size: 0.9rem;
+    color: rgba(36, 67, 58, 0.9);
+    line-height: 1.5;
+}
+
+.service-info {
+    flex: 1;
+    padding: 0.95rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.service-info h5 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--forest);
+    margin: 0 0 0.4rem;
+    line-height: 1.3;
+}
+
+.service-duration {
+    font-size: 0.75rem;
+    color: rgba(36, 67, 58, 0.6);
+    margin-bottom: 0.5rem;
+}
+
+.service-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0.95rem 0.95rem;
+    padding-top: auto;
+}
+
+.service-price {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--gold);
+}
+
+.service-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(36, 67, 58, 0.2);
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.service-option input[type="checkbox"]:checked ~ .service-card-modern {
+    border-color: var(--forest);
+    background: linear-gradient(135deg, rgba(40, 70, 56, 0.08), rgba(141, 187, 171, 0.05));
+    box-shadow: 0 6px 18px rgba(40, 70, 56, 0.12);
+}
+
+.service-option input[type="checkbox"]:checked ~ .service-card-modern .service-checkbox {
+    background: var(--forest);
+    border-color: var(--forest);
+}
+
+.service-option:hover .service-card-modern {
+    border-color: var(--sage);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(141, 187, 171, 0.15);
+}
+
+.service-option:hover .service-image {
+    transform: scale(1.05);
+}
+
+.service-card-modern.addon {
+    border-color: rgba(209, 169, 108, 0.2);
+    background: rgba(252, 248, 242, 0.95);
+}
+
+.service-option input[type="checkbox"]:checked ~ .service-card-modern.addon {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, rgba(209, 169, 108, 0.1), rgba(196, 145, 61, 0.05));
+}
+
+/* Therapist Grid - Modern */
+.therapist-grid-modern {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 1.2rem;
+}
+
+.therapist-option {
+    cursor: pointer;
+}
+
+.therapist-card-modern {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1.2rem 1rem;
+    border: 2px solid rgba(36, 67, 58, 0.12);
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.97);
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 10px rgba(36, 67, 58, 0.06);
+}
+
+.therapist-card-modern img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(36, 67, 58, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.therapist-card-modern h5 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--forest);
+    margin: 0;
+}
+
+.therapist-card-modern .therapist-role {
+    font-size: 0.75rem;
+    color: rgba(36, 67, 58, 0.6);
+}
+
+.therapist-option input[type="radio"]:checked ~ .therapist-card-modern {
+    border-color: var(--forest);
+    background: linear-gradient(135deg, rgba(40, 70, 56, 0.08), rgba(141, 187, 171, 0.05));
+    box-shadow: 0 6px 18px rgba(40, 70, 56, 0.12);
+}
+
+.therapist-option input[type="radio"]:checked ~ .therapist-card-modern img {
+    border-color: var(--forest);
+}
+
+.therapist-option:hover .therapist-card-modern {
+    border-color: var(--sage);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(141, 187, 171, 0.15);
+}
+
+.therapist-option:hover .therapist-card-modern img {
+    transform: scale(1.05);
+}
+
+/* Payment Options */
+.payment-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.payment-option {
+    cursor: pointer;
+}
+
+.payment-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 1.2rem;
+    border: 2px solid rgba(36, 67, 58, 0.12);
+    border-radius: 1.1rem;
+    background: rgba(255, 255, 255, 0.97);
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 8px rgba(36, 67, 58, 0.05);
+}
+
+.payment-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--forest);
+}
+
+.payment-desc {
+    font-size: 0.75rem;
+    color: rgba(36, 67, 58, 0.6);
+}
+
+.payment-option input[type="radio"]:checked ~ .payment-card {
+    border-color: var(--forest);
+    background: linear-gradient(135deg, rgba(40, 70, 56, 0.08), rgba(141, 187, 171, 0.05));
+    box-shadow: 0 6px 16px rgba(40, 70, 56, 0.12);
+}
+
+.payment-option:hover .payment-card {
+    border-color: var(--sage);
+    transform: translateY(-2px);
+}
+
+/* Order Summary */
+.order-summary {
+    background: linear-gradient(135deg, rgba(141, 187, 171, 0.08), rgba(240, 247, 244, 0.95));
+    border: 1.5px solid rgba(36, 67, 58, 0.1);
+    border-radius: 1.3rem;
+    padding: 1.5rem;
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}
+
+.order-summary h5 {
+    font-size: 0.9rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--forest);
+    margin-bottom: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0;
+    font-size: 0.85rem;
+}
+
+.summary-label {
+    color: rgba(36, 67, 58, 0.7);
+}
+
+.summary-value {
+    font-weight: 700;
+    color: var(--forest);
+}
+
+.summary-divider {
+    height: 1px;
+    background: rgba(36, 67, 58, 0.1);
+    margin: 1rem 0;
+}
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--forest);
+    padding-top: 0.5rem;
+}
+
+.summary-total strong {
+    color: var(--gold);
+    font-size: 1.2rem;
+}
+
+/* Step Actions */
+.step-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2.5rem;
+}
+
+.step-actions .btn {
+    flex: 1;
+    padding: 0.9rem 1.5rem;
+    font-weight: 700;
+    border-radius: 1rem;
+    font-size: 0.95rem;
+    text-transform: capitalize;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+
+.step-actions .btn-next-step {
+    background: linear-gradient(135deg, var(--forest), var(--sage));
+    color: white;
+}
+
+.step-actions .btn-next-step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 70, 56, 0.25);
+}
+
+.step-actions .btn-secondary {
+    background: rgba(36, 67, 58, 0.1);
+    color: var(--forest);
+    border: 1px solid rgba(36, 67, 58, 0.2);
+}
+
+.step-actions .btn-secondary:hover {
+    background: rgba(36, 67, 58, 0.15);
+    transform: translateY(-2px);
+}
+
+.step-actions .btn-primary {
+    background: linear-gradient(135deg, var(--forest), #1a3329);
+    border-color: var(--forest);
+    color: #fff;
+}
+
+.step-actions .btn-primary:hover {
+    background: linear-gradient(135deg, #1a3329, var(--forest));
+    border-color: #1a3329;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(36, 67, 58, 0.35);
+}
+
+/* Mobile Responsive */
+@media (max-width: 767px) {
+    .booking-progress-pills {
+        padding: 1rem 0.75rem;
+        gap: 0.3rem;
+    }
+    
+    .progress-pill {
+        gap: 0.3rem;
+    }
+    
+    .pill-number {
+        width: 28px;
+        height: 28px;
+        font-size: 0.8rem;
+    }
+    
+    .pill-label {
+        font-size: 0.6rem;
+    }
+    
+    .step-content {
+        padding: 1.5rem 1rem;
+    }
+    
+    .step-header {
+        margin-bottom: 2rem;
+    }
+    
+    .step-header h3 {
+        font-size: 1.3rem;
+    }
+    
+    .form-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-section-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .area-selector {
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 0.8rem;
+    }
+    
+    .area-badge {
+        padding: 1rem 0.8rem;
+        font-size: 0.8rem;
+    }
+    
+    .service-grid-modern {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 1rem;
+    }
+    
+    .service-image {
+        height: 90px;
+    }
+
+    .service-info-btn {
+        width: 22px;
+        height: 22px;
+        font-size: 0.72rem;
+    }
+    
+    .therapist-grid-modern {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 1rem;
+    }
+    
+    .therapist-card-modern img {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .payment-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .order-summary {
+        padding: 1.2rem;
+        margin-top: 1.5rem;
+    }
+    
+    .step-actions {
+        gap: 0.8rem;
+    }
+    
+    .step-actions .btn {
+        padding: 0.8rem 1rem;
+        font-size: 0.9rem;
     }
 }
 
@@ -2860,5 +4130,23 @@ h1, h2, h3, h4, h5, h6, .navbar-brand {
     font-size: 0.75rem;
     padding: 0.2rem 0.6rem;
     flex: 1 1 auto;
+}
+
+@media (max-width: 767px) {
+    #admin-audit .admin-audit-table th:nth-child(2),
+    #admin-audit .admin-audit-table th:nth-child(3),
+    #admin-audit .admin-audit-table th:nth-child(4),
+    #admin-audit .admin-audit-table td:nth-child(2),
+    #admin-audit .admin-audit-table td:nth-child(3),
+    #admin-audit .admin-audit-table td:nth-child(4) {
+        display: none;
+    }
+
+    #admin-audit .admin-audit-table th:last-child,
+    #admin-audit .admin-audit-table td:last-child {
+        width: 1%;
+        white-space: nowrap;
+        text-align: right;
+    }
 }
 

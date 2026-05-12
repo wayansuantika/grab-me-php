@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Core\Database;
 use App\Core\FileCache;
+use App\Services\StripeService;
 
 class AdminWriteService
 {
@@ -404,6 +405,101 @@ class AdminWriteService
         ], $bookingId, 'booking', $context);
 
         return $this->result(true, 'Booking cancelled. If paid via bank transfer, please process a manual refund.');
+    }
+
+    public function syncStripePayment(array $data, int $adminId, array $context = []): array
+    {
+        $bookingId = (int) ($data['booking_id'] ?? 0);
+        if ($bookingId <= 0) {
+            return $this->result(false, 'Invalid booking ID.', 422);
+        }
+
+        $pdo = Database::connection();
+
+        $bookingStmt = $pdo->prepare('SELECT id, booking_code, payment_status, booking_status FROM bookings WHERE id = :id LIMIT 1');
+        $bookingStmt->execute(['id' => $bookingId]);
+        $booking = $bookingStmt->fetch();
+        if (!$booking) {
+            return $this->result(false, 'Booking not found.', 404);
+        }
+
+        $paymentStmt = $pdo->prepare('SELECT id, provider, provider_payment_id, status FROM payments WHERE booking_id = :booking_id AND provider = :provider ORDER BY id DESC LIMIT 1');
+        $paymentStmt->execute([
+            'booking_id' => $bookingId,
+            'provider' => 'stripe',
+        ]);
+        $payment = $paymentStmt->fetch();
+        if (!$payment) {
+            return $this->result(false, 'No Stripe payment record found for this booking.', 404);
+        }
+
+        $providerPaymentId = trim((string) ($payment['provider_payment_id'] ?? ''));
+        if ($providerPaymentId === '') {
+            return $this->result(false, 'Stripe payment reference is missing.', 422);
+        }
+
+        $stripe = new StripeService();
+        $intentResult = $stripe->retrievePaymentIntent($providerPaymentId);
+        if (!$intentResult['success']) {
+            return $this->result(false, 'Stripe sync failed: ' . (string) ($intentResult['message'] ?? 'Unknown error.'), 502);
+        }
+
+        $intent = (array) ($intentResult['data'] ?? []);
+        $intentStatus = strtolower((string) ($intent['status'] ?? ''));
+
+        $paymentStatus = 'pending';
+        $bookingPaymentStatus = 'pending';
+        $bookingStatus = 'pending_payment';
+
+        if ($intentStatus === 'succeeded') {
+            $paymentStatus = 'succeeded';
+            $bookingPaymentStatus = 'paid';
+            $bookingStatus = 'confirmed';
+        } elseif (in_array($intentStatus, ['canceled', 'requires_payment_method'], true)) {
+            $paymentStatus = 'failed';
+            $bookingPaymentStatus = 'failed';
+            $bookingStatus = 'pending_payment';
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('UPDATE payments SET status = :status, raw_payload = :raw_payload, updated_at = :updated_at WHERE id = :id')->execute([
+                'status' => $paymentStatus,
+                'raw_payload' => json_encode($intent, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'updated_at' => now(),
+                'id' => (int) $payment['id'],
+            ]);
+
+            $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, booking_status = :booking_status, updated_at = :updated_at WHERE id = :id')->execute([
+                'payment_status' => $bookingPaymentStatus,
+                'booking_status' => $bookingStatus,
+                'updated_at' => now(),
+                'id' => $bookingId,
+            ]);
+
+            $pdo->commit();
+            $this->clearAdminReadCache();
+
+            $this->auditLog($adminId, 'stripe_payment_synced', [
+                'booking_id' => $bookingId,
+                'booking_code' => (string) $booking['booking_code'],
+                'payment_id' => (int) $payment['id'],
+                'provider_payment_id' => $providerPaymentId,
+                'stripe_intent_status' => $intentStatus,
+                'local_payment_status' => $paymentStatus,
+                'local_booking_payment_status' => $bookingPaymentStatus,
+            ], (int) $payment['id'], 'payment', $context);
+
+            if ($intentStatus === 'succeeded') {
+                return $this->result(true, 'Stripe payment synced. Booking is now marked as paid.');
+            }
+
+            return $this->result(true, 'Stripe payment synced. Current intent status: ' . ($intentStatus !== '' ? $intentStatus : 'unknown') . '.');
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            app_log('Admin Stripe sync error: ' . $e->getMessage());
+            return $this->result(false, 'Failed to sync Stripe payment status.', 500);
+        }
     }
 
     private function auditLog(int $adminId, string $action, array $details = [], int $targetId = 0, string $targetType = '', array $context = []): void

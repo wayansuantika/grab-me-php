@@ -249,7 +249,7 @@ class BookingService
 
         // Validate payment method
         $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? 'bank_transfer')));
-        if (!in_array($paymentMethod, ['bank_transfer', 'credit_card'])) {
+        if (!in_array($paymentMethod, ['bank_transfer', 'credit_card', 'paypal', 'stripe'])) {
             $errors['payment_method'] = 'Invalid payment method.';
         }
 

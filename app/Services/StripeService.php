@@ -59,6 +59,42 @@ class StripeService
         return ['success' => true, 'data' => $decoded];
     }
 
+    public function retrievePaymentIntent(string $intentId): array
+    {
+        $intentId = trim($intentId);
+        if ($this->secretKey === '') {
+            return ['success' => false, 'message' => 'Stripe key not configured.'];
+        }
+        if ($intentId === '') {
+            return ['success' => false, 'message' => 'Stripe intent ID is required.'];
+        }
+
+        $ch = curl_init('https://api.stripe.com/v1/payment_intents/' . rawurlencode($intentId));
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPGET => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->secretKey,
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false || $error !== '') {
+            return ['success' => false, 'message' => 'Stripe request error: ' . $error];
+        }
+
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded) || $statusCode >= 400) {
+            return ['success' => false, 'message' => $decoded['error']['message'] ?? 'Stripe API error.'];
+        }
+
+        return ['success' => true, 'data' => $decoded];
+    }
+
     public function verifyWebhookSignature(string $payload, string $signatureHeader): bool
     {
         if ($this->webhookSecret === '' || $signatureHeader === '') {

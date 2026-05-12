@@ -125,7 +125,7 @@ class AdminReadService
 
             return [
                 'payments' => $pdo->query('
-                    SELECT p.id, p.booking_id, b.booking_code, b.customer_name, b.customer_phone,
+                    SELECT p.id, p.booking_id, b.booking_code, b.customer_name, b.customer_phone, b.booking_status,
                            p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.created_at
                     FROM payments p
                     INNER JOIN bookings b ON b.id = p.booking_id

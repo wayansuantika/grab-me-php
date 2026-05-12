@@ -126,7 +126,13 @@ class AuthController
     public function me(): void
     {
         if (!Auth::check()) {
-            json_response(['success' => false, 'message' => 'Unauthenticated.'], 401);
+            json_response([
+                'success' => true,
+                'data' => [
+                    'user' => null,
+                    'csrf_token' => csrf_token(),
+                ],
+            ]);
         }
 
         json_response([

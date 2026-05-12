@@ -31,13 +31,16 @@ class TherapistController
 
         if ($date !== null && $time !== null) {
             $sql .= "
-              AND EXISTS (
-                SELECT 1
-                FROM therapist_schedules sch
-                WHERE sch.therapist_id = t.id
-                  AND sch.day_of_week = WEEKDAY(:booking_date)
-                  AND sch.is_available = 1
-                  AND :booking_time BETWEEN sch.start_time AND sch.end_time
+              AND (
+                NOT EXISTS (SELECT 1 FROM therapist_schedules s2 WHERE s2.therapist_id = t.id)
+                OR EXISTS (
+                  SELECT 1
+                  FROM therapist_schedules sch
+                  WHERE sch.therapist_id = t.id
+                    AND sch.day_of_week = WEEKDAY(:booking_date)
+                    AND sch.is_available = 1
+                    AND :booking_time BETWEEN sch.start_time AND sch.end_time
+                )
               )
             ";
         }

@@ -1,5 +1,10 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Deny direct access to dotfiles and sensitive config/secrets.
+    RewriteRule "(^|/)\." - [F,L]
+    RewriteRule "(?i)\.(env|ini|log|sql|bak|dist|yaml|yml|toml|git|svn)$" - [F,L]
+
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [QSA,L]

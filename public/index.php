@@ -56,8 +56,10 @@ $routes = [
         '#^/api/auth/login$#' => [AuthController::class, 'login'],
         '#^/api/auth/logout$#' => [AuthController::class, 'logout'],
         '#^/api/bookings$#' => [BookingController::class, 'create'],
-        '#^/api/payments/create-intent$#' => [PaymentController::class, 'createIntent'],
-        '#^/api/payments/webhook$#' => [PaymentController::class, 'webhook'],
+        '#^/api/payments/create-intent/?$#' => [PaymentController::class, 'createIntent'],
+        '#^/api/payments/paypal/capture/?$#' => [PaymentController::class, 'capturePayPalOrder'],
+        '#^/api/payments/webhook/?$#' => [PaymentController::class, 'webhook'],
+        '#^/api/payments/paypal/webhook/?$#' => [PaymentController::class, 'paypalWebhook'],
         '#^/api/therapist/schedule$#' => [TherapistPanelController::class, 'updateSchedule'],
         '#^/api/therapist/profile-photo$#' => [TherapistPanelController::class, 'updateProfilePhoto'],
         '#^/api/therapist/profile-photo/select$#' => [TherapistPanelController::class, 'selectProfilePhoto'],
@@ -68,6 +70,7 @@ $routes = [
         '#^/api/admin/services/save$#' => [AdminController::class, 'saveService'],
         '#^/api/admin/areas/save$#' => [AdminController::class, 'saveArea'],
         '#^/api/admin/payments/confirm$#' => [AdminController::class, 'confirmPayment'],
+        '#^/api/admin/payments/sync-stripe$#' => [AdminController::class, 'syncStripePayment'],
         '#^/api/admin/bookings/cancel$#' => [AdminController::class, 'cancelBooking'],
         '#^/api/admin/files/upload$#' => [AdminController::class, 'uploadFile'],
         '#^/api/admin/files/(\d+)/delete$#' => [AdminController::class, 'deleteFile'],
@@ -91,6 +94,17 @@ if (str_starts_with($uriPath, '/api/')) {
             $controller = new $class();
             $controller->{$action}(...array_map('intval', $matches));
             exit;
+        }
+    }
+
+    foreach ($routes as $routeMethod => $routeList) {
+        if ($routeMethod === $method) {
+            continue;
+        }
+        foreach ($routeList as $pattern => $_handler) {
+            if (preg_match($pattern, $uriPath) === 1) {
+                json_response(['success' => false, 'message' => 'Method not allowed.'], 405);
+            }
         }
     }
 
@@ -143,12 +157,9 @@ $jsVersion = (string) (@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
                 <div class="col-6 col-lg-2">
                     <h6 class="footer-heading mb-3">Explore</h6>
                     <ul class="list-unstyled d-grid gap-1 small">
-                        <li><a href="#/home">Home</a></li>
                         <li><a href="#/about">About</a></li>
                         <li><a href="#/booking">Booking</a></li>
                         <li><a href="#/auth">Login</a></li>
-                        <li><a href="#/therapists">Therapists</a></li>
-                        <li><a href="#/contact">Contact</a></li>
                     </ul>
                 </div>
                 <div class="col-6 col-lg-3">
@@ -165,7 +176,7 @@ $jsVersion = (string) (@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
                     <ul class="list-unstyled d-grid gap-2 small footer-muted">
                         <li>&#128205; Ubud · Canggu · Kuta · Sanur · Seminyak · Denpasar · Tabanan</li>
                         <li>&#128222; WhatsApp Concierge Available</li>
-                        <li>&#128336; Open 7 Days &middot; 8 AM &ndash; 10 PM</li>
+                        <li>&#128336; Open 7 Days &middot; 9 AM &ndash; 6 PM</li>
                     </ul>
                 </div>
             </div>
